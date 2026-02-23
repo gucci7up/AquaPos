@@ -13,6 +13,12 @@ const initialProducts: any[] = [];
 
 const categoryKeys = ['Apparel', 'Grocery', 'Electronics', 'Home', 'Fitness', 'General'];
 
+console.log('Appwrite Connectivity:', {
+  DATABASE: !!DATABASE_ID,
+  INVENTORY: !!COLLECTION_ID,
+  CATEGORIES: !!COLLECTION_CATEGORIES_ID
+});
+
 export default function Inventory() {
   const { t } = useLanguage();
   const navigate = useNavigate();
@@ -259,8 +265,11 @@ export default function Inventory() {
           await databases.createDocument(DATABASE_ID, COLLECTION_CATEGORIES_ID, ID.unique(), { name });
         } catch (error: any) {
           console.error('Error saving category to Appwrite:', error);
-          alert(`No se pudo guardar la categoría en Appwrite: ${error.message}. Asegúrate de haber creado la colección "categories" con el atributo "name" y los permisos para "Any".`);
+          alert(`Error al guardar categoría en Appwrite: ${error.message}`);
         }
+      } else {
+        console.warn('Cannot save category: DATABASE_ID or COLLECTION_CATEGORIES_ID is missing');
+        alert(`Error de configuración: No se pudo encontrar el ID de la colección de categorías en .env.local (VITE_APPWRITE_COLLECTION_CATEGORIES_ID)`);
       }
     }
   };
