@@ -13,12 +13,6 @@ const initialProducts: any[] = [];
 
 const categoryKeys = ['Apparel', 'Grocery', 'Electronics', 'Home', 'Fitness', 'General'];
 
-console.log('Appwrite Connectivity:', {
-  DATABASE: !!DATABASE_ID,
-  INVENTORY: !!COLLECTION_ID,
-  CATEGORIES: !!COLLECTION_CATEGORIES_ID
-});
-
 export default function Inventory() {
   const { t } = useLanguage();
   const navigate = useNavigate();
@@ -78,14 +72,6 @@ export default function Inventory() {
         id: doc.$id
       }));
       setProducts(mappedProducts);
-
-      // Derive categories from product data
-      const dynamicCategories = mappedProducts
-        .map(p => p.category)
-        .filter((cat): cat is string => !!cat && cat !== 'All');
-
-      const allUnique = Array.from(new Set([...categoryKeys, ...dynamicCategories]));
-      setCategories(allUnique);
     } catch (error) {
       console.error('Error fetching products:', error);
     } finally {

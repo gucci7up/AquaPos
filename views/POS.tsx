@@ -51,14 +51,6 @@ export default function POS() {
           lowStock: (doc.stock || 0) <= 5
         }));
         setProducts(mapped);
-
-        // Derive dynamic categories
-        const dynamicCategories = mapped
-          .map(p => p.category)
-          .filter((cat): cat is string => !!cat && cat !== 'All');
-
-        const allUnique = Array.from(new Set(['All', ...categoryKeys, ...dynamicCategories]));
-        setCategories(allUnique.filter(c => c !== 'All')); // 'All' is handled separately in some UI parts
       } catch (error) {
         console.error('Error fetching products for POS:', error);
       } finally {
