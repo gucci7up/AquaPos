@@ -33,8 +33,11 @@ export default function Dashboard() {
   const [notifications, setNotifications] = useState(0);
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
 
+  const [mounted, setMounted] = useState(false);
+
   useEffect(() => {
     fetchDashboardData();
+    setMounted(true);
   }, []);
 
   const fetchDashboardData = async () => {
@@ -49,12 +52,18 @@ export default function Dashboard() {
       if (COLLECTION_INVENTORY_ID) {
         try {
           const lowStockResponse = await databases.listDocuments(DATABASE_ID, COLLECTION_INVENTORY_ID, [
-            Query.lessThan('stock', 10),
-            Query.limit(1)
+            Query.greaterThan('$createdAt', '1970-01-01T00:00:00.000Z'), // Dummy query to avoid empty queries if needed
+            Query.limit(100)
           ]);
-          setInventoryStats({ lowStockCount: lowStockResponse.total });
+
+          // Filter in memory if the 'stock' attribute might be missing from some docs or query fails
+          const lowStockCount = lowStockResponse.documents.filter((doc: any) =>
+            doc.stock !== undefined && doc.stock < 10
+          ).length;
+
+          setInventoryStats({ lowStockCount: lowStockCount || 0 });
         } catch (invErr) {
-          console.warn('Could not fetch stock alerts (attribute "stock" might be missing):', invErr);
+          // If the query fails (index missing or attribute missing), don't crash the dashboard
           setInventoryStats({ lowStockCount: 0 });
         }
       }
@@ -251,43 +260,45 @@ export default function Dashboard() {
               </div>
             </div>
             <div className="h-64 w-full min-h-[256px]">
-              <ResponsiveContainer width="99%" height="100%">
-                <AreaChart data={chartData}>
-                  <defs>
-                    <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#13daec" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="#13daec" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <Tooltip
-                    contentStyle={{ backgroundColor: '#fff', borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                    itemStyle={{ color: '#0f172a', fontWeight: 'bold' }}
-                    cursor={{ stroke: '#94a3b8', strokeWidth: 1 }}
-                    formatter={(value: any) => [`$${value}`, 'Revenue']}
-                  />
-                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 12 }} />
-                  <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 12 }} prefix="$" />
-                  <CartesianGrid vertical={false} stroke="#f1f5f9" />
-                  <Area
-                    type="monotone"
-                    dataKey="value"
-                    stroke="#13daec"
-                    strokeWidth={3}
-                    fillOpacity={1}
-                    fill="url(#colorValue)"
-                    animationDuration={1000}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="prev"
-                    stroke="#e2e8f0"
-                    strokeDasharray="5 5"
-                    strokeWidth={2}
-                    fill="none"
-                    animationDuration={1000}
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
+              {mounted && (
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#13daec" stopOpacity={0.3} />
+                        <stop offset="95%" stopColor="#13daec" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <Tooltip
+                      contentStyle={{ backgroundColor: '#fff', borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                      itemStyle={{ color: '#0f172a', fontWeight: 'bold' }}
+                      cursor={{ stroke: '#94a3b8', strokeWidth: 1 }}
+                      formatter={(value: any) => [`$${value}`, 'Revenue']}
+                    />
+                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 12 }} />
+                    <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 12 }} prefix="$" />
+                    <CartesianGrid vertical={false} stroke="#f1f5f9" />
+                    <Area
+                      type="monotone"
+                      dataKey="value"
+                      stroke="#13daec"
+                      strokeWidth={3}
+                      fillOpacity={1}
+                      fill="url(#colorValue)"
+                      animationDuration={1000}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="prev"
+                      stroke="#e2e8f0"
+                      strokeDasharray="5 5"
+                      strokeWidth={2}
+                      fill="none"
+                      animationDuration={1000}
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              )}
             </div>
           </div>
 
