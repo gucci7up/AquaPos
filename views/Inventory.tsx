@@ -73,7 +73,6 @@ export default function Inventory() {
     sku: '',
     barcode: '',
     category: 'General',
-    subCategory: '',
     stock: 0,
     cost: 0,
     price: 0,
@@ -134,7 +133,6 @@ export default function Inventory() {
         sku: product.sku || '',
         barcode: product.barcode || '',
         category: product.category || 'General',
-        subCategory: product.subCategory || '',
         stock: product.stock || 0,
         cost: product.cost || 0,
         price: product.price || 0,
@@ -150,7 +148,6 @@ export default function Inventory() {
         sku: generateRandomSKU(defaultCategory),
         barcode: generateRandomBarcode(),
         category: defaultCategory,
-        subCategory: '',
         stock: 0,
         cost: 0,
         price: 0,
@@ -687,7 +684,7 @@ const FilterButton = ({ active, onClick, label, color }: any) => {
   );
 };
 
-const InventoryRow = ({ image, name, sub, sku, barcode, displayCategory, subCategory, stock, stockColor, cost, price, onEdit, onDelete }: any) => (
+const InventoryRow = ({ image, name, sub, sku, barcode, displayCategory, stock, stockColor, cost, price, onEdit, onDelete }: any) => (
   <tr className="group hover:bg-slate-50/80 transition-all border-b border-transparent hover:border-slate-100">
     <td className="px-6 py-4">
       <div className="flex items-center gap-4">
