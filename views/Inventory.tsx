@@ -55,6 +55,7 @@ export default function Inventory() {
       setCategories(allUnique);
     } catch (error: any) {
       console.error('Error fetching categories in Inventory:', error);
+      alert(`Error al cargar categorías: ${error.message}`);
       setCategories(categoryKeys);
     }
   };

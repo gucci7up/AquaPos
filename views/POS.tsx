@@ -80,6 +80,7 @@ export default function POS() {
       setCategories(allUnique.filter(c => c !== 'All'));
     } catch (error: any) {
       console.error('Error fetching categories for POS:', error);
+      alert(`Error al cargar categorías en POS: ${error.message}`);
       // Fallback to defaults if collection missing
       setCategories(categoryKeys.filter(c => c !== 'All'));
     }
