@@ -39,16 +39,23 @@ export default function Inventory() {
   }, []);
 
   const fetchCategories = async () => {
-    if (!DATABASE_ID || !COLLECTION_CATEGORIES_ID) return;
-    try {
-      const response = await databases.listDocuments(DATABASE_ID, COLLECTION_CATEGORIES_ID);
-      const catNames = response.documents.map(doc => doc.name);
-      // Merge with default keys and filter duplicates
-      const allUnique = Array.from(new Set([...categoryKeys, ...catNames]));
-      setCategories(allUnique);
-    } catch (error) {
-      console.error('Error fetching categories:', error);
+    let collectionCats: string[] = [];
+    if (DATABASE_ID && COLLECTION_CATEGORIES_ID) {
+      try {
+        const response = await databases.listDocuments(DATABASE_ID, COLLECTION_CATEGORIES_ID);
+        collectionCats = response.documents.map(doc => doc.name);
+      } catch (error) {
+        console.warn('Categories collection not found or inaccessible, using fallback.');
+      }
     }
+
+    // Always merge with categories already in products (Hybrid fallback)
+    const productCats = products
+      .map(p => p.category)
+      .filter((cat): cat is string => !!cat && cat !== 'All');
+
+    const allUnique = Array.from(new Set([...categoryKeys, ...collectionCats, ...productCats]));
+    setCategories(allUnique);
   };
 
   const fetchProducts = async () => {

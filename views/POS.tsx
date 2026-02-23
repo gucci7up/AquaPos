@@ -70,16 +70,23 @@ export default function POS() {
   }, []);
 
   const fetchCategories = async () => {
-    if (!DATABASE_ID || !COLLECTION_CATEGORIES_ID) return;
-    try {
-      const response = await databases.listDocuments(DATABASE_ID, COLLECTION_CATEGORIES_ID);
-      const catNames = response.documents.map(doc => doc.name);
-      // Merge with default keys and filter duplicates
-      const allUnique = Array.from(new Set(['All', ...categoryKeys, ...catNames]));
-      setCategories(allUnique.filter(c => c !== 'All'));
-    } catch (error) {
-      console.error('Error fetching categories for POS:', error);
+    let collectionCats: string[] = [];
+    if (DATABASE_ID && COLLECTION_CATEGORIES_ID) {
+      try {
+        const response = await databases.listDocuments(DATABASE_ID, COLLECTION_CATEGORIES_ID);
+        collectionCats = response.documents.map(doc => doc.name);
+      } catch (error) {
+        console.warn('Categories collection not found for POS, using fallback.');
+      }
     }
+
+    // Hybrid fallback: merge with categories from products
+    const productCats = products
+      .map(p => p.category)
+      .filter((cat): cat is string => !!cat && cat !== 'All');
+
+    const allUnique = Array.from(new Set(['All', ...categoryKeys, ...collectionCats, ...productCats]));
+    setCategories(allUnique.filter(c => c !== 'All'));
   };
 
   // Customer State
