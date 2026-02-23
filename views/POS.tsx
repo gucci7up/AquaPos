@@ -11,10 +11,19 @@ const mockProductsFallback: any[] = [];
 
 const COLLECTION_CUSTOMERS_ID = import.meta.env.VITE_APPWRITE_COLLECTION_CUSTOMERS_ID;
 
-const categoryKeys = ['All', 'Perfumes', 'Apparel', 'Accessories', 'Beauty'];
+const categoryKeys = ['All', 'Apparel', 'Grocery', 'Electronics', 'Home', 'Fitness', 'Accessories', 'Perfumes', 'Beauty', 'General'];
 
 export default function POS() {
   const { t } = useLanguage();
+
+  // helper to get category display name
+  const getCategoryDisplay = (cat: string) => {
+    if (cat === 'All') return t('inventory.allCategories');
+    const key = `data.categories.${cat}`;
+    const translation = t(key);
+    return translation === key ? cat : translation;
+  };
+
   const [products, setProducts] = useState(mockProductsFallback);
   const [loading, setLoading] = useState(true);
   const [cart, setCart] = useState<any[]>([]);
@@ -342,7 +351,7 @@ export default function POS() {
                   : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
                   }`}
               >
-                {t(`data.categories.${catKey}`) || catKey}
+                {getCategoryDisplay(catKey)}
               </button>
             ))}
           </div>

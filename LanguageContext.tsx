@@ -7,103 +7,103 @@ const LanguageContext = createContext<any>(null);
 const translations = {
   en: {
     userMenu: {
-        profile: "Profile",
-        settings: "Settings",
-        logout: "Sign Out",
-        account: "Account"
+      profile: "Profile",
+      settings: "Settings",
+      logout: "Sign Out",
+      account: "Account"
     },
     auth: {
-        welcomeBack: "Welcome Back",
-        welcomeSubtitle: "Enter your credentials to access your workspace.",
-        createAccount: "Create Account",
-        createSubtitle: "Start your 14-day free trial today.",
-        email: "Work Email",
-        password: "Password",
-        fullName: "Full Name",
-        companyName: "Company Name",
-        forgotPassword: "Forgot Password?",
-        login: "Sign In",
-        register: "Start Free Trial",
-        noAccount: "Don't have an account?",
-        hasAccount: "Already have an account?",
-        signUp: "Sign Up",
-        signIn: "Sign In",
-        or: "OR CONTINUE WITH",
-        terms: "By clicking continue, you agree to our Terms of Service and Privacy Policy."
+      welcomeBack: "Welcome Back",
+      welcomeSubtitle: "Enter your credentials to access your workspace.",
+      createAccount: "Create Account",
+      createSubtitle: "Start your 14-day free trial today.",
+      email: "Work Email",
+      password: "Password",
+      fullName: "Full Name",
+      companyName: "Company Name",
+      forgotPassword: "Forgot Password?",
+      login: "Sign In",
+      register: "Start Free Trial",
+      noAccount: "Don't have an account?",
+      hasAccount: "Already have an account?",
+      signUp: "Sign Up",
+      signIn: "Sign In",
+      or: "OR CONTINUE WITH",
+      terms: "By clicking continue, you agree to our Terms of Service and Privacy Policy."
     },
     landing: {
-        nav: {
-            solutions: "Solutions",
-            why: "Why AquaPos",
-            pricing: "Pricing",
-            login: "Login",
-            start: "Start Free Trial"
-        },
-        hero: {
-            new: "New: AquaAI v2.0",
-            title: "The Operating System for",
-            titleHighlight: "Your Business",
-            subtitle: "High-performance Point of Sale, intelligent inventory management, and 4-decimal precision finance. Everything your enterprise needs in one platform.",
-            demo: "Watch Demo",
-            noCard: "No credit card required · 14 days free"
-        },
-        solutions: {
-            title: "Solutions Tailored to You",
-            subtitle: "Adapted to the specific needs of leading businesses in Latin America.",
-            retail: { title: "Retail", desc: "Real-time stock management, multiple branches, and unlimited barcodes." },
-            restaurant: { title: "Restaurants & Cafes", desc: "Order management, table tracking, and ingredient inventory. Integrated with delivery apps." },
-            wholesale: { title: "Wholesalers", desc: "Bulk handling, volume pricing, and automated customer credit tracking." },
-            digital: { title: "Digital Sellers", desc: "Social media sync, payment links, and instant electronic invoicing." },
-            learnMore: "Learn more"
+      nav: {
+        solutions: "Solutions",
+        why: "Why AquaPos",
+        pricing: "Pricing",
+        login: "Login",
+        start: "Start Free Trial"
+      },
+      hero: {
+        new: "New: AquaAI v2.0",
+        title: "The Operating System for",
+        titleHighlight: "Your Business",
+        subtitle: "High-performance Point of Sale, intelligent inventory management, and 4-decimal precision finance. Everything your enterprise needs in one platform.",
+        demo: "Watch Demo",
+        noCard: "No credit card required · 14 days free"
+      },
+      solutions: {
+        title: "Solutions Tailored to You",
+        subtitle: "Adapted to the specific needs of leading businesses in Latin America.",
+        retail: { title: "Retail", desc: "Real-time stock management, multiple branches, and unlimited barcodes." },
+        restaurant: { title: "Restaurants & Cafes", desc: "Order management, table tracking, and ingredient inventory. Integrated with delivery apps." },
+        wholesale: { title: "Wholesalers", desc: "Bulk handling, volume pricing, and automated customer credit tracking." },
+        digital: { title: "Digital Sellers", desc: "Social media sync, payment links, and instant electronic invoicing." },
+        learnMore: "Learn more"
+      },
+      features: {
+        title: "Enterprise Power at your fingertips",
+        subtitle: "We are not just a cash register. We are the engine driving your growth with cutting-edge technology.",
+        sync: { title: "Local-First Sync", desc: "Internet down? No problem. AquaPos works offline and syncs your sales as soon as you reconnect." },
+        precision: { title: "4-Decimal Precision", desc: "Ideal for weight-based sales or currency exchange. Not a cent is lost in rounding errors." },
+        ai: { title: "AquaAI Insights", desc: "Artificial intelligence that predicts stock shortages and recommends dynamic pricing based on the market." }
+      },
+      pricing: {
+        title: "Flexible Plans",
+        subtitle: "Scale AquaPos as your business grows. No forced contracts.",
+        monthly: "/mo",
+        annual: "Billed annually",
+        start: "Start Free",
+        choose: "Choose",
+        contact: "Contact Sales",
+        mostPopular: "Most Popular",
+        plans: {
+          free: "Entrepreneur",
+          pro: "Professional",
+          growth: "Growth",
+          corp: "Corporate"
         },
         features: {
-            title: "Enterprise Power at your fingertips",
-            subtitle: "We are not just a cash register. We are the engine driving your growth with cutting-edge technology.",
-            sync: { title: "Local-First Sync", desc: "Internet down? No problem. AquaPos works offline and syncs your sales as soon as you reconnect." },
-            precision: { title: "4-Decimal Precision", desc: "Ideal for weight-based sales or currency exchange. Not a cent is lost in rounding errors." },
-            ai: { title: "AquaAI Insights", desc: "Artificial intelligence that predicts stock shortages and recommends dynamic pricing based on the market." }
-        },
-        pricing: {
-            title: "Flexible Plans",
-            subtitle: "Scale AquaPos as your business grows. No forced contracts.",
-            monthly: "/mo",
-            annual: "Billed annually",
-            start: "Start Free",
-            choose: "Choose",
-            contact: "Contact Sales",
-            mostPopular: "Most Popular",
-            plans: {
-                free: "Entrepreneur",
-                pro: "Professional",
-                growth: "Growth",
-                corp: "Corporate"
-            },
-            features: {
-                free: ["1 User", "100 Products", "Basic Invoicing"],
-                pro: ["3 Users", "Unlimited Products", "Sales Reports", "Local-First Sync"],
-                growth: ["10 Users", "AquaAI Basic", "Electronic Invoicing", "API Access"],
-                corp: ["Unlimited Users", "AquaAI Enterprise", "Account Manager", "White Label Ready"]
-            }
-        },
-        footer: {
-            desc: "The first enterprise operating system designed for SMEs in Latin America. High performance and simplicity.",
-            product: "Product",
-            company: "Company",
-            support: "Support",
-            privacy: "Privacy",
-            terms: "Terms",
-            cookies: "Cookies"
-        },
-        form: {
-            title: "Schedule a Demo",
-            subtitle: "Fill out the form below and our team will contact you shortly.",
-            name: "Full Name",
-            email: "Work Email",
-            company: "Company Name",
-            message: "How can we help?",
-            submit: "Submit Request",
-            success: "Request Sent Successfully!"
+          free: ["1 User", "100 Products", "Basic Invoicing"],
+          pro: ["3 Users", "Unlimited Products", "Sales Reports", "Local-First Sync"],
+          growth: ["10 Users", "AquaAI Basic", "Electronic Invoicing", "API Access"],
+          corp: ["Unlimited Users", "AquaAI Enterprise", "Account Manager", "White Label Ready"]
         }
+      },
+      footer: {
+        desc: "The first enterprise operating system designed for SMEs in Latin America. High performance and simplicity.",
+        product: "Product",
+        company: "Company",
+        support: "Support",
+        privacy: "Privacy",
+        terms: "Terms",
+        cookies: "Cookies"
+      },
+      form: {
+        title: "Schedule a Demo",
+        subtitle: "Fill out the form below and our team will contact you shortly.",
+        name: "Full Name",
+        email: "Work Email",
+        company: "Company Name",
+        message: "How can we help?",
+        submit: "Submit Request",
+        success: "Request Sent Successfully!"
+      }
     },
     sidebar: {
       mainMenu: "Main Menu",
@@ -157,16 +157,19 @@ const translations = {
     data: {
       categories: {
         All: "All Items",
-        Beverages: "Beverages",
-        Bakery: "Bakery",
-        Snacks: "Snacks",
-        Produce: "Produce",
         Apparel: "Apparel",
         Grocery: "Grocery",
         Electronics: "Electronics",
         Home: "Home",
         Fitness: "Fitness",
-        General: "General"
+        General: "General",
+        Accessories: "Accessories",
+        Perfumes: "Perfumes",
+        Beauty: "Beauty",
+        Beverages: "Beverages",
+        Bakery: "Bakery",
+        Snacks: "Snacks",
+        Produce: "Produce"
       },
       sort: {
         LastUpdated: "Last Updated",
@@ -389,32 +392,32 @@ const translations = {
       saveProfile: "Save Profile"
     },
     suppliers: {
-        title: "Suppliers & Purchasing",
-        subtitle: "Manage suppliers and reorder stock via Purchase Orders.",
-        tabOrders: "Purchase Orders",
-        tabSuppliers: "Suppliers Directory",
-        searchPlaceholder: "Search orders or suppliers...",
-        createOrder: "New Purchase Order",
-        addSupplier: "Add Supplier",
-        stats: {
-            pending: "Pending Orders",
-            received: "Received Orders",
-            activeSuppliers: "Active Suppliers",
-            spending: "Spending (Mo)"
-        },
-        table: {
-            supplier: "Supplier",
-            date: "Order Date",
-            expected: "Expected",
-            total: "Total Cost",
-            status: "Status",
-            name: "Supplier Name",
-            contact: "Contact",
-            category: "Category",
-            leadTime: "Lead Time"
-        },
-        selectSupplier: "Select Supplier",
-        createDraft: "Create Draft Order"
+      title: "Suppliers & Purchasing",
+      subtitle: "Manage suppliers and reorder stock via Purchase Orders.",
+      tabOrders: "Purchase Orders",
+      tabSuppliers: "Suppliers Directory",
+      searchPlaceholder: "Search orders or suppliers...",
+      createOrder: "New Purchase Order",
+      addSupplier: "Add Supplier",
+      stats: {
+        pending: "Pending Orders",
+        received: "Received Orders",
+        activeSuppliers: "Active Suppliers",
+        spending: "Spending (Mo)"
+      },
+      table: {
+        supplier: "Supplier",
+        date: "Order Date",
+        expected: "Expected",
+        total: "Total Cost",
+        status: "Status",
+        name: "Supplier Name",
+        contact: "Contact",
+        category: "Category",
+        leadTime: "Lead Time"
+      },
+      selectSupplier: "Select Supplier",
+      createDraft: "Create Draft Order"
     },
     ai: {
       title: "AquaAI Intelligence Hub",
@@ -434,32 +437,32 @@ const translations = {
     settings: {
       title: "System Settings",
       tabs: {
-          general: "General",
-          branding: "Branding",
-          team: "Team",
-          billing: "Plans & Billing",
-          integrations: "Integrations"
+        general: "General",
+        branding: "Branding",
+        team: "Team",
+        billing: "Plans & Billing",
+        integrations: "Integrations"
       },
       businessProfile: "Business Profile",
       businessDesc: "Manage your public business identity and contact details.",
       roles: "Team Roles & Permissions",
       rolesDesc: "Define access levels for your staff members.",
       team: {
-          directory: "User Directory"
+        directory: "User Directory"
       },
       plans: {
-          title: "Manage Subscription Plans",
-          subtitle: "Create and modify the pricing tiers available to your customers."
+        title: "Manage Subscription Plans",
+        subtitle: "Create and modify the pricing tiers available to your customers."
       },
       branding: {
-          title: "Branding & Customization",
-          subtitle: "Customize the look and feel of your AquaPos instance.",
-          landingImages: "Landing Page Visuals",
-          heroImage: "Hero Section Image",
-          featureImage: "Feature/Dashboard Image",
-          uploadLocal: "Browse File",
-          enterUrl: "Paste image URL...",
-          or: "OR"
+        title: "Branding & Customization",
+        subtitle: "Customize the look and feel of your AquaPos instance.",
+        landingImages: "Landing Page Visuals",
+        heroImage: "Hero Section Image",
+        featureImage: "Feature/Dashboard Image",
+        uploadLocal: "Browse File",
+        enterUrl: "Paste image URL...",
+        or: "OR"
       },
       integrations: "Integration Hub",
       subscription: "Subscription",
@@ -479,16 +482,16 @@ const translations = {
       cancel: "Cancel"
     },
     subscriptions: {
-        title: "Subscription Management",
-        searchPlaceholder: "Search subscribers...",
-        customer: "Customer",
-        plan: "Plan",
-        amount: "Amount",
-        status: "Status",
-        billing: "Next Billing",
-        manageSub: "Manage Subscription",
-        cycle: "Billing Cycle",
-        update: "Update Subscription"
+      title: "Subscription Management",
+      searchPlaceholder: "Search subscribers...",
+      customer: "Customer",
+      plan: "Plan",
+      amount: "Amount",
+      status: "Status",
+      billing: "Next Billing",
+      manageSub: "Manage Subscription",
+      cycle: "Billing Cycle",
+      update: "Update Subscription"
     },
     support: {
       title: "Support & Expert Help Center",
@@ -510,103 +513,103 @@ const translations = {
   },
   es: {
     userMenu: {
-        profile: "Perfil",
-        settings: "Configuración",
-        logout: "Cerrar Sesión",
-        account: "Cuenta"
+      profile: "Perfil",
+      settings: "Configuración",
+      logout: "Cerrar Sesión",
+      account: "Cuenta"
     },
     auth: {
-        welcomeBack: "Bienvenido",
-        welcomeSubtitle: "Ingresa tus credenciales para acceder.",
-        createAccount: "Crear Cuenta",
-        createSubtitle: "Inicia tu prueba gratuita de 14 días.",
-        email: "Correo Corporativo",
-        password: "Contraseña",
-        fullName: "Nombre Completo",
-        companyName: "Nombre de la Empresa",
-        forgotPassword: "¿Olvidaste tu contraseña?",
-        login: "Iniciar Sesión",
-        register: "Empezar Prueba Gratis",
-        noAccount: "¿No tienes una cuenta?",
-        hasAccount: "¿Ya tienes una cuenta?",
-        signUp: "Regístrate",
-        signIn: "Ingresa",
-        or: "O CONTINÚA CON",
-        terms: "Al continuar, aceptas nuestros Términos de Servicio y Política de Privacidad."
+      welcomeBack: "Bienvenido",
+      welcomeSubtitle: "Ingresa tus credenciales para acceder.",
+      createAccount: "Crear Cuenta",
+      createSubtitle: "Inicia tu prueba gratuita de 14 días.",
+      email: "Correo Corporativo",
+      password: "Contraseña",
+      fullName: "Nombre Completo",
+      companyName: "Nombre de la Empresa",
+      forgotPassword: "¿Olvidaste tu contraseña?",
+      login: "Iniciar Sesión",
+      register: "Empezar Prueba Gratis",
+      noAccount: "¿No tienes una cuenta?",
+      hasAccount: "¿Ya tienes una cuenta?",
+      signUp: "Regístrate",
+      signIn: "Ingresa",
+      or: "O CONTINÚA CON",
+      terms: "Al continuar, aceptas nuestros Términos de Servicio y Política de Privacidad."
     },
     landing: {
-        nav: {
-            solutions: "Soluciones",
-            why: "Por qué AquaPos",
-            pricing: "Precios",
-            login: "Ingresar",
-            start: "Empezar Prueba Gratis"
-        },
-        hero: {
-            new: "NUEVO: AQUAAI V2.0",
-            title: "El Sistema Operativo de",
-            titleHighlight: "tu Negocio",
-            subtitle: "Punto de venta de alto rendimiento, gestión de inventario inteligente y finanzas con precisión de 4 decimales. Todo lo que tu empresa necesita en una sola plataforma.",
-            demo: "Ver Demo",
-            noCard: "No se requiere tarjeta de crédito · 14 días gratis"
-        },
-        solutions: {
-            title: "Soluciones a tu Medida",
-            subtitle: "Adaptado a las necesidades específicas de los negocios líderes en Latinoamérica.",
-            retail: { title: "Retail", desc: "Gestión de stock en tiempo real, múltiples sucursales y códigos de barra ilimitados." },
-            restaurant: { title: "Restaurantes y Cafés", desc: "Control de comandas, gestión de mesas e ingredientes. Integrado con apps de delivery." },
-            wholesale: { title: "Mayoristas", desc: "Manejo de bultos, precios por volumen y créditos a clientes con seguimiento automatizado." },
-            digital: { title: "Vendedores Digitales", desc: "Sincronización con redes sociales, links de pago y facturación electrónica instantánea." },
-            learnMore: "Saber más"
+      nav: {
+        solutions: "Soluciones",
+        why: "Por qué AquaPos",
+        pricing: "Precios",
+        login: "Ingresar",
+        start: "Empezar Prueba Gratis"
+      },
+      hero: {
+        new: "NUEVO: AQUAAI V2.0",
+        title: "El Sistema Operativo de",
+        titleHighlight: "tu Negocio",
+        subtitle: "Punto de venta de alto rendimiento, gestión de inventario inteligente y finanzas con precisión de 4 decimales. Todo lo que tu empresa necesita en una sola plataforma.",
+        demo: "Ver Demo",
+        noCard: "No se requiere tarjeta de crédito · 14 días gratis"
+      },
+      solutions: {
+        title: "Soluciones a tu Medida",
+        subtitle: "Adaptado a las necesidades específicas de los negocios líderes en Latinoamérica.",
+        retail: { title: "Retail", desc: "Gestión de stock en tiempo real, múltiples sucursales y códigos de barra ilimitados." },
+        restaurant: { title: "Restaurantes y Cafés", desc: "Control de comandas, gestión de mesas e ingredientes. Integrado con apps de delivery." },
+        wholesale: { title: "Mayoristas", desc: "Manejo de bultos, precios por volumen y créditos a clientes con seguimiento automatizado." },
+        digital: { title: "Vendedores Digitales", desc: "Sincronización con redes sociales, links de pago y facturación electrónica instantánea." },
+        learnMore: "Saber más"
+      },
+      features: {
+        title: "Potencia Enterprise al alcance de tu mano",
+        subtitle: "No somos solo una caja registradora. Somos el motor que impulsa tu crecimiento con tecnología de punta.",
+        sync: { title: "Local-First Sync", desc: "¿Se cayó el internet? No hay problema. AquaPos funciona offline y sincroniza tus ventas apenas recuperes la conexión." },
+        precision: { title: "Precisión de 4 Decimales", desc: "Ideal para venta por peso o cambio de divisas. Ni un centavo se pierde en redondeos imprecisos." },
+        ai: { title: "AquaAI Insights", desc: "Inteligencia artificial que predice faltantes de stock y recomienda precios dinámicos según el mercado." }
+      },
+      pricing: {
+        title: "Planes Flexibles",
+        subtitle: "Escala AquaPos a medida que tu negocio crece. Sin contratos forzosos.",
+        monthly: "/mes",
+        annual: "Pago anual",
+        start: "Empezar Gratis",
+        choose: "Elegir",
+        contact: "Contactar Ventas",
+        mostPopular: "MOST POPULAR",
+        plans: {
+          free: "EMPRENDEDOR",
+          pro: "PROFESIONAL",
+          growth: "CRECIMIENTO",
+          corp: "CORPORATIVO"
         },
         features: {
-            title: "Potencia Enterprise al alcance de tu mano",
-            subtitle: "No somos solo una caja registradora. Somos el motor que impulsa tu crecimiento con tecnología de punta.",
-            sync: { title: "Local-First Sync", desc: "¿Se cayó el internet? No hay problema. AquaPos funciona offline y sincroniza tus ventas apenas recuperes la conexión." },
-            precision: { title: "Precisión de 4 Decimales", desc: "Ideal para venta por peso o cambio de divisas. Ni un centavo se pierde en redondeos imprecisos." },
-            ai: { title: "AquaAI Insights", desc: "Inteligencia artificial que predice faltantes de stock y recomienda precios dinámicos según el mercado." }
-        },
-        pricing: {
-            title: "Planes Flexibles",
-            subtitle: "Escala AquaPos a medida que tu negocio crece. Sin contratos forzosos.",
-            monthly: "/mes",
-            annual: "Pago anual",
-            start: "Empezar Gratis",
-            choose: "Elegir",
-            contact: "Contactar Ventas",
-            mostPopular: "MOST POPULAR",
-            plans: {
-                free: "EMPRENDEDOR",
-                pro: "PROFESIONAL",
-                growth: "CRECIMIENTO",
-                corp: "CORPORATIVO"
-            },
-            features: {
-                free: ["1 Usuario", "100 Productos", "Facturación Básica"],
-                pro: ["3 Usuarios", "Productos Ilimitados", "Reportes de Ventas", "Local-First Sync"],
-                growth: ["10 Usuarios", "AquaAI Básico", "Facturación Electrónica", "API Access"],
-                corp: ["Usuarios Ilimitados", "AquaAI Enterprise", "Account Manager", "White Label Ready"]
-            }
-        },
-        footer: {
-            desc: "El primer sistema operativo empresarial diseñado para las PYMEs de América Latina. Alto rendimiento y simplicidad.",
-            product: "Producto",
-            company: "Compañía",
-            support: "Soporte",
-            privacy: "Privacidad",
-            terms: "Términos",
-            cookies: "Cookies"
-        },
-        form: {
-            title: "Solicita una Demo",
-            subtitle: "Completa el formulario y nuestro equipo te contactará en breve.",
-            name: "Nombre Completo",
-            email: "Email de Trabajo",
-            company: "Nombre de la Empresa",
-            message: "¿Cómo podemos ayudarte?",
-            submit: "Enviar Solicitud",
-            success: "¡Solicitud Enviada con Éxito!"
+          free: ["1 Usuario", "100 Productos", "Facturación Básica"],
+          pro: ["3 Usuarios", "Productos Ilimitados", "Reportes de Ventas", "Local-First Sync"],
+          growth: ["10 Usuarios", "AquaAI Básico", "Facturación Electrónica", "API Access"],
+          corp: ["Usuarios Ilimitados", "AquaAI Enterprise", "Account Manager", "White Label Ready"]
         }
+      },
+      footer: {
+        desc: "El primer sistema operativo empresarial diseñado para las PYMEs de América Latina. Alto rendimiento y simplicidad.",
+        product: "Producto",
+        company: "Compañía",
+        support: "Soporte",
+        privacy: "Privacidad",
+        terms: "Términos",
+        cookies: "Cookies"
+      },
+      form: {
+        title: "Solicita una Demo",
+        subtitle: "Completa el formulario y nuestro equipo te contactará en breve.",
+        name: "Nombre Completo",
+        email: "Email de Trabajo",
+        company: "Nombre de la Empresa",
+        message: "¿Cómo podemos ayudarte?",
+        submit: "Enviar Solicitud",
+        success: "¡Solicitud Enviada con Éxito!"
+      }
     },
     sidebar: {
       mainMenu: "Menú Principal",
@@ -660,16 +663,19 @@ const translations = {
     data: {
       categories: {
         All: "Todos los ítems",
-        Beverages: "Bebidas",
-        Bakery: "Panadería",
-        Snacks: "Snacks",
-        Produce: "Frutas/Verduras",
         Apparel: "Ropa",
         Grocery: "Abarrotes",
         Electronics: "Electrónica",
         Home: "Hogar",
         Fitness: "Fitness",
-        General: "General"
+        General: "General",
+        Accessories: "Accesorios",
+        Perfumes: "Perfumes",
+        Beauty: "Belleza",
+        Beverages: "Bebidas",
+        Bakery: "Panadería",
+        Snacks: "Snacks",
+        Produce: "Frutas/Verduras"
       },
       sort: {
         LastUpdated: "Últ. Actualización",
@@ -892,32 +898,32 @@ const translations = {
       saveProfile: "Guardar Perfil"
     },
     suppliers: {
-        title: "Proveedores y Compras",
-        subtitle: "Gestiona proveedores y reabastece inventario mediante Órdenes de Compra.",
-        tabOrders: "Órdenes de Compra",
-        tabSuppliers: "Directorio Proveedores",
-        searchPlaceholder: "Buscar órdenes o proveedores...",
-        createOrder: "Nueva Orden de Compra",
-        addSupplier: "Agregar Proveedor",
-        stats: {
-            pending: "Órdenes Pendientes",
-            received: "Órdenes Recibidas",
-            activeSuppliers: "Prov. Activos",
-            spending: "Gasto Mensual"
-        },
-        table: {
-            supplier: "Proveedor",
-            date: "Fecha Orden",
-            expected: "Fecha Esperada",
-            total: "Costo Total",
-            status: "Estado",
-            name: "Nombre Proveedor",
-            contact: "Contacto",
-            category: "Categoría",
-            leadTime: "Tiempo Entrega"
-        },
-        selectSupplier: "Seleccionar Proveedor",
-        createDraft: "Crear Borrador"
+      title: "Proveedores y Compras",
+      subtitle: "Gestiona proveedores y reabastece inventario mediante Órdenes de Compra.",
+      tabOrders: "Órdenes de Compra",
+      tabSuppliers: "Directorio Proveedores",
+      searchPlaceholder: "Buscar órdenes o proveedores...",
+      createOrder: "Nueva Orden de Compra",
+      addSupplier: "Agregar Proveedor",
+      stats: {
+        pending: "Órdenes Pendientes",
+        received: "Órdenes Recibidas",
+        activeSuppliers: "Prov. Activos",
+        spending: "Gasto Mensual"
+      },
+      table: {
+        supplier: "Proveedor",
+        date: "Fecha Orden",
+        expected: "Fecha Esperada",
+        total: "Costo Total",
+        status: "Estado",
+        name: "Nombre Proveedor",
+        contact: "Contacto",
+        category: "Categoría",
+        leadTime: "Tiempo Entrega"
+      },
+      selectSupplier: "Seleccionar Proveedor",
+      createDraft: "Crear Borrador"
     },
     ai: {
       title: "Centro de Inteligencia AquaAI",
@@ -937,32 +943,32 @@ const translations = {
     settings: {
       title: "Configuración del Sistema",
       tabs: {
-          general: "General",
-          branding: "Marca",
-          team: "Equipo",
-          billing: "Planes y Facturación",
-          integrations: "Integraciones"
+        general: "General",
+        branding: "Marca",
+        team: "Equipo",
+        billing: "Planes y Facturación",
+        integrations: "Integraciones"
       },
       businessProfile: "Perfil de Negocio",
       businessDesc: "Administra tu identidad pública y contacto.",
       roles: "Roles y Permisos",
       rolesDesc: "Define niveles de acceso para tu equipo.",
       team: {
-          directory: "Directorio de Usuarios"
+        directory: "Directorio de Usuarios"
       },
       plans: {
-          title: "Gestionar Planes de Suscripción",
-          subtitle: "Crea y modifica los niveles de precios disponibles para tus clientes."
+        title: "Gestionar Planes de Suscripción",
+        subtitle: "Crea y modifica los niveles de precios disponibles para tus clientes."
       },
       branding: {
-          title: "Marca y Personalización",
-          subtitle: "Personaliza la apariencia de tu instancia AquaPos.",
-          landingImages: "Imágenes Landing Page",
-          heroImage: "Imagen Sección Hero",
-          featureImage: "Imagen Destacada/Dashboard",
-          uploadLocal: "Subir Archivo",
-          enterUrl: "Pegar URL de imagen...",
-          or: "O"
+        title: "Marca y Personalización",
+        subtitle: "Personaliza la apariencia de tu instancia AquaPos.",
+        landingImages: "Imágenes Landing Page",
+        heroImage: "Imagen Sección Hero",
+        featureImage: "Imagen Destacada/Dashboard",
+        uploadLocal: "Subir Archivo",
+        enterUrl: "Pegar URL de imagen...",
+        or: "O"
       },
       integrations: "Centro de Integración",
       subscription: "Suscripción",
@@ -982,16 +988,16 @@ const translations = {
       cancel: "Cancelar"
     },
     subscriptions: {
-        title: "Gestión de Suscripciones",
-        searchPlaceholder: "Buscar suscriptores...",
-        customer: "Cliente",
-        plan: "Plan",
-        amount: "Monto",
-        status: "Estado",
-        billing: "Próx. Factura",
-        manageSub: "Gestionar Suscripción",
-        cycle: "Ciclo Facturación",
-        update: "Actualizar Suscripción"
+      title: "Gestión de Suscripciones",
+      searchPlaceholder: "Buscar suscriptores...",
+      customer: "Cliente",
+      plan: "Plan",
+      amount: "Monto",
+      status: "Estado",
+      billing: "Próx. Factura",
+      manageSub: "Gestionar Suscripción",
+      cycle: "Ciclo Facturación",
+      update: "Actualizar Suscripción"
     },
     support: {
       title: "Centro de Ayuda y Soporte",

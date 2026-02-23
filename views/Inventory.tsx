@@ -1,10 +1,12 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useLanguage } from '../LanguageContext';
 import UserMenu from '../UserMenu';
-import { databases, ID, Query } from '@/lib/appwrite';
+import { databases, storage, ID, Query } from '@/lib/appwrite';
+import { useNavigate } from 'react-router-dom';
 
 const DATABASE_ID = import.meta.env.VITE_APPWRITE_DATABASE_ID;
 const COLLECTION_ID = import.meta.env.VITE_APPWRITE_COLLECTION_INVENTORY_ID;
+const BUCKET_ID = import.meta.env.VITE_APPWRITE_BUCKET_IMAGES_ID || 'products';
 
 const initialProducts: any[] = [];
 
@@ -12,6 +14,7 @@ const categoryKeys = ['Apparel', 'Grocery', 'Electronics', 'Home', 'Fitness', 'G
 
 export default function Inventory() {
   const { t } = useLanguage();
+  const navigate = useNavigate();
   const [products, setProducts] = useState(initialProducts);
   const [categories, setCategories] = useState(categoryKeys);
   const [loading, setLoading] = useState(true);
@@ -19,6 +22,14 @@ export default function Inventory() {
   const [filterStatus, setFilterStatus] = useState('All'); // All, In Stock, Low Stock, Out of Stock
   const [filterCategory, setFilterCategory] = useState('All');
   const [sortBy, setSortBy] = useState('LastUpdated');
+
+  // helper to get category display name
+  const getCategoryDisplay = (cat: string) => {
+    const key = `data.categories.${cat}`;
+    const translation = t(key);
+    // If translation returns the key itself, it means it's a custom category or missing translation
+    return translation === key ? cat : translation;
+  };
 
   // Fetch products on mount
   useEffect(() => {
@@ -35,12 +46,12 @@ export default function Inventory() {
     try {
       setLoading(true);
       const response = await databases.listDocuments(DATABASE_ID, COLLECTION_ID, [
-        Query.orderDesc('$createdAt')
+        Query.orderDesc('$createdAt'),
+        Query.limit(100)
       ]);
-      // Map Appwrite response as needed
       const mappedProducts = response.documents.map(doc => ({
         ...doc,
-        id: doc.$id // Use $id as the primary identifier
+        id: doc.$id
       }));
       setProducts(mappedProducts);
     } catch (error) {
@@ -53,8 +64,21 @@ export default function Inventory() {
   // Product Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<any>(null);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
+
   const [formData, setFormData] = useState({
-    name: '', sub: '', sku: '', barcode: '', category: 'General', subCategory: '', stock: 0, cost: 0, price: 0
+    name: '',
+    sub: '',
+    sku: '',
+    barcode: '',
+    category: 'General',
+    subCategory: '',
+    stock: 0,
+    cost: 0,
+    price: 0,
+    icon: 'inventory_2',
+    image: ''
   });
 
   // Category Modal State
@@ -66,33 +90,32 @@ export default function Inventory() {
     let result = [...products];
 
     // Filter by Status
-    if (filterStatus === 'InStock') result = result.filter(p => p.stock > 20);
-    if (filterStatus === 'LowStock') result = result.filter(p => p.stock > 0 && p.stock <= 20);
-    if (filterStatus === 'OutOfStock') result = result.filter(p => p.stock === 0);
+    if (filterStatus === 'InStock') result = result.filter(p => (p.stock || 0) > 20);
+    if (filterStatus === 'LowStock') result = result.filter(p => (p.stock || 0) > 0 && (p.stock || 0) <= 20);
+    if (filterStatus === 'OutOfStock') result = result.filter(p => (p.stock || 0) === 0);
 
     // Filter by Category
     if (filterCategory !== 'All') result = result.filter(p => p.category === filterCategory);
 
     // Sort
     if (sortBy === 'Name') result.sort((a, b) => a.name.localeCompare(b.name));
-    if (sortBy === 'Stock') result.sort((a, b) => a.stock - b.stock);
-    if (sortBy === 'Price') result.sort((a, b) => b.price - a.price);
+    if (sortBy === 'Stock') result.sort((a, b) => (a.stock || 0) - (b.stock || 0));
+    if (sortBy === 'Price') result.sort((a, b) => (b.price || 0) - (a.price || 0));
 
     return result;
   }, [products, filterStatus, filterCategory, sortBy]);
 
-  const totalValue = useMemo(() => products.reduce((acc, curr) => acc + (curr.stock * curr.cost), 0), [products]);
-  const lowStockItems = useMemo(() => products.filter(p => p.stock > 0 && p.stock <= 20), [products]);
+  const totalValue = useMemo(() => products.reduce((acc, curr) => acc + ((curr.stock || 0) * (curr.cost || 0)), 0), [products]);
+  const lowStockItems = useMemo(() => products.filter(p => (p.stock || 0) > 0 && (p.stock || 0) <= 20), [products]);
 
   // Generators
   const generateRandomSKU = (category: string) => {
-    const prefix = category.substring(0, 3).toUpperCase();
+    const prefix = (category || 'GEN').substring(0, 3).toUpperCase();
     const randomNum = Math.floor(1000 + Math.random() * 9000);
     return `${prefix}-${randomNum}`;
   };
 
   const generateRandomBarcode = () => {
-    // Simple 13 digit EAN-13 style generator
     let result = '';
     for (let i = 0; i < 13; i++) {
       result += Math.floor(Math.random() * 10);
@@ -102,12 +125,24 @@ export default function Inventory() {
 
   // Handlers
   const handleOpenModal = (product: any = null) => {
+    setImageFile(null);
     if (product) {
       setEditingProduct(product);
-      setFormData({ ...product });
+      setFormData({
+        name: product.name || '',
+        sub: product.sub || '',
+        sku: product.sku || '',
+        barcode: product.barcode || '',
+        category: product.category || 'General',
+        subCategory: product.subCategory || '',
+        stock: product.stock || 0,
+        cost: product.cost || 0,
+        price: product.price || 0,
+        icon: product.icon || 'inventory_2',
+        image: product.image || ''
+      });
     } else {
       setEditingProduct(null);
-      // Auto-generate SKU and Barcode for new products
       const defaultCategory = categories[0] || 'General';
       setFormData({
         name: '',
@@ -118,7 +153,9 @@ export default function Inventory() {
         subCategory: '',
         stock: 0,
         cost: 0,
-        price: 0
+        price: 0,
+        icon: 'inventory_2',
+        image: ''
       });
     }
     setIsModalOpen(true);
@@ -128,19 +165,46 @@ export default function Inventory() {
     if (!DATABASE_ID || !COLLECTION_ID) return;
 
     setLoading(true);
+    setUploading(true);
     try {
-      if (editingProduct) {
-        await databases.updateDocument(DATABASE_ID, COLLECTION_ID, editingProduct.id, formData);
-      } else {
-        await databases.createDocument(DATABASE_ID, COLLECTION_ID, ID.unique(), formData);
+      let imageUrl = formData.image;
+
+      // Handle Image Upload
+      if (imageFile) {
+        try {
+          const uploadedFile = await storage.createFile(BUCKET_ID, ID.unique(), imageFile);
+          imageUrl = storage.getFileView(BUCKET_ID, uploadedFile.$id).toString();
+        } catch (uploadErr) {
+          console.error('Image upload failed:', uploadErr);
+          // Continue saving without image if upload fails
+        }
       }
+
+      const submissionData = { ...formData, image: imageUrl };
+
+      // Clean data types for Appwrite
+      submissionData.stock = parseInt(submissionData.stock as any) || 0;
+      submissionData.cost = parseFloat(submissionData.cost as any) || 0;
+      submissionData.price = parseFloat(submissionData.price as any) || 0;
+
+      if (editingProduct) {
+        await databases.updateDocument(DATABASE_ID, COLLECTION_ID, editingProduct.id, submissionData);
+      } else {
+        await databases.createDocument(DATABASE_ID, COLLECTION_ID, ID.unique(), submissionData);
+      }
+
       await fetchProducts(); // Refresh list
       setIsModalOpen(false);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving product:', error);
-      alert('Failed to save product. Check console / credentials.');
+      let errorMsg = error.message || 'Check console / credentials.';
+      if (errorMsg.includes('Attribute not found')) {
+        errorMsg = 'Error: Schema mismatch. Please ensure attributes (stock, cost, price, etc) exist in Appwrite.';
+      }
+      alert(`Failed to save product: ${errorMsg}`);
     } finally {
       setLoading(false);
+      setUploading(false);
     }
   };
 
@@ -159,15 +223,6 @@ export default function Inventory() {
     }
   };
 
-  const regenerateIdentifiers = () => {
-    setFormData(prev => ({
-      ...prev,
-      sku: generateRandomSKU(prev.category),
-      barcode: generateRandomBarcode()
-    }));
-  };
-
-  // Category Handlers
   const handleAddCategory = () => {
     if (newCategoryName.trim() && !categories.includes(newCategoryName.trim())) {
       setCategories([...categories, newCategoryName.trim()]);
@@ -183,13 +238,13 @@ export default function Inventory() {
   };
 
   const getStockColor = (stock: number) => {
-    if (stock === 0) return 'red-500';
-    if (stock <= 20) return 'amber-500';
-    return 'emerald-500';
+    if (stock === 0) return 'bg-red-500';
+    if (stock <= 20) return 'bg-amber-500';
+    return 'bg-emerald-500';
   };
 
   return (
-    <div className="flex flex-1 flex-row h-full overflow-hidden relative">
+    <div className="flex flex-1 flex-row h-full overflow-hidden relative bg-slate-50/50">
       {/* Main Table Area */}
       <div className="flex flex-1 flex-col p-8 overflow-y-auto">
         <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
@@ -223,10 +278,9 @@ export default function Inventory() {
           <div className="flex flex-wrap gap-3">
             <div className="relative group">
               <button className="flex items-center gap-2 rounded-lg bg-slate-50 px-4 py-2 text-sm font-medium hover:bg-slate-100 min-w-[160px] justify-between">
-                {filterCategory === 'All' ? t('inventory.allCategories') : t(`data.categories.${filterCategory}`) || filterCategory}
+                {filterCategory === 'All' ? t('inventory.allCategories') : getCategoryDisplay(filterCategory)}
                 <span className="material-symbols-outlined text-lg">expand_more</span>
               </button>
-              {/* Simple Dropdown for Demo */}
               <div className="absolute top-full left-0 mt-2 w-48 bg-white rounded-xl shadow-xl border border-slate-100 hidden group-hover:block z-20">
                 <div className="p-2 space-y-1 max-h-60 overflow-y-auto custom-scrollbar">
                   <button
@@ -241,7 +295,7 @@ export default function Inventory() {
                       onClick={() => setFilterCategory(cat)}
                       className="w-full text-left px-3 py-2 rounded-lg text-sm hover:bg-slate-50 text-slate-700"
                     >
-                      {t(`data.categories.${cat}`) || cat}
+                      {getCategoryDisplay(cat)}
                     </button>
                   ))}
                 </div>
@@ -285,7 +339,7 @@ export default function Inventory() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200">
-                {loading ? (
+                {loading && !uploading ? (
                   <tr>
                     <td colSpan={6} className="px-6 py-12 text-center text-slate-500">
                       <span className="size-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin inline-block mb-2"></span>
@@ -298,7 +352,7 @@ export default function Inventory() {
                       <InventoryRow
                         key={product.id}
                         {...product}
-                        displayCategory={t(`data.categories.${product.category}`) || product.category}
+                        displayCategory={getCategoryDisplay(product.category)}
                         stockColor={getStockColor(product.stock)}
                         onEdit={() => handleOpenModal(product)}
                         onDelete={() => handleDelete(product.id)}
@@ -317,48 +371,39 @@ export default function Inventory() {
               </tbody>
             </table>
           </div>
-          <div className="flex items-center justify-between border-t border-slate-200 bg-white px-6 py-4 shrink-0">
-            <div className="text-sm text-slate-500">
-              Showing <span className="font-bold text-slate-900">{filteredProducts.length}</span> products
-            </div>
-            {/* Pagination Placeholder */}
-            <div className="flex gap-2">
-              <button className="flex size-8 items-center justify-center rounded-lg border border-slate-200 hover:bg-slate-50 disabled:opacity-50"><span className="material-symbols-outlined text-lg">chevron_left</span></button>
-              <button className="flex size-8 items-center justify-center rounded-lg bg-primary text-sm font-bold text-slate-900">1</button>
-              <button className="flex size-8 items-center justify-center rounded-lg border border-slate-200 hover:bg-slate-50 disabled:opacity-50"><span className="material-symbols-outlined text-lg">chevron_right</span></button>
-            </div>
-          </div>
         </div>
       </div>
 
       {/* Right Sidebar */}
-      <aside className="w-80 border-l border-slate-200 bg-white/50 px-6 py-8 hidden xl:block overflow-y-auto">
-        <div className="sticky top-0">
-          <div className="mb-6 flex items-center gap-2">
-            <div className="flex size-8 items-center justify-center rounded-full bg-primary/20 text-primary">
-              <span className="material-symbols-outlined text-lg">auto_awesome</span>
+      <aside className="w-80 border-l border-slate-200 bg-white px-6 py-8 hidden xl:block overflow-y-auto">
+        <div className="sticky top-0 space-y-8">
+          <div>
+            <div className="mb-6 flex items-center gap-2">
+              <div className="flex size-8 items-center justify-center rounded-full bg-primary/20 text-primary">
+                <span className="material-symbols-outlined text-lg">auto_awesome</span>
+              </div>
+              <h3 className="font-bold text-slate-900">{t('inventory.quickInsights')}</h3>
+              <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-black uppercase text-primary">AquaAI</span>
             </div>
-            <h3 className="font-bold text-slate-900">{t('inventory.quickInsights')}</h3>
-            <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-black uppercase text-primary">AquaAI</span>
-          </div>
 
-          <div className="mb-6 rounded-xl border border-primary/20 bg-primary/5 p-4">
-            <div className="mb-3 flex items-center justify-between">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">{t('inventory.projectedStockout')}</h4>
-              <span className="material-symbols-outlined text-primary text-sm">trending_down</span>
-            </div>
-            <div className="space-y-4">
-              {lowStockItems.slice(0, 3).map(item => (
-                <StockoutBar
-                  key={item.id}
-                  name={item.name}
-                  days="Critical"
-                  percent={`${(item.stock / 20) * 100}%`}
-                  color={item.stock === 0 ? "bg-red-500" : "bg-amber-500"}
-                  textColor={item.stock === 0 ? "text-red-600" : "text-amber-600"}
-                />
-              ))}
-              {lowStockItems.length === 0 && <p className="text-xs text-slate-500">Inventory levels are healthy.</p>}
+            <div className="rounded-xl border border-primary/20 bg-primary/5 p-4">
+              <div className="mb-3 flex items-center justify-between">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">{t('inventory.projectedStockout')}</h4>
+                <span className="material-symbols-outlined text-primary text-sm">trending_down</span>
+              </div>
+              <div className="space-y-4">
+                {lowStockItems.slice(0, 3).map(item => (
+                  <StockoutBar
+                    key={item.id}
+                    name={item.name}
+                    days="Critical"
+                    percent={`${(item.stock / 20) * 100}%`}
+                    color={item.stock === 0 ? "bg-red-500" : "bg-amber-500"}
+                    textColor={item.stock === 0 ? "text-red-600" : "text-amber-600"}
+                  />
+                ))}
+                {lowStockItems.length === 0 && <p className="text-xs text-slate-500">Inventory levels are healthy.</p>}
+              </div>
             </div>
           </div>
 
@@ -375,7 +420,6 @@ export default function Inventory() {
                   <div className="flex-1">
                     <p className="text-xs font-bold">{p.name}</p>
                     <p className="text-[10px] text-slate-500">Out of stock. Recommended reorder: 50 units.</p>
-                    <button className="mt-2 text-[10px] font-bold text-primary underline">Express Reorder</button>
                   </div>
                 </div>
               ))}
@@ -383,15 +427,15 @@ export default function Inventory() {
             </div>
           </div>
 
-          <div className="mt-8 rounded-xl bg-slate-100 p-4">
+          <div className="rounded-xl bg-slate-900 p-4 text-white">
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <p className="text-[10px] font-medium text-slate-500">{t('inventory.totalValue')}</p>
-                <p className="text-sm font-bold">${totalValue.toFixed(2)}</p>
+                <p className="text-[10px] font-medium text-slate-400">{t('inventory.totalValue')}</p>
+                <p className="text-lg font-black">${totalValue.toLocaleString()}</p>
               </div>
               <div>
-                <p className="text-[10px] font-medium text-slate-500">{t('inventory.activeSkus')}</p>
-                <p className="text-sm font-bold">{products.length}</p>
+                <p className="text-[10px] font-medium text-slate-400">{t('inventory.activeSkus')}</p>
+                <p className="text-lg font-black">{products.length}</p>
               </div>
             </div>
           </div>
@@ -400,111 +444,179 @@ export default function Inventory() {
 
       {/* Add/Edit Product Modal */}
       {isModalOpen && (
-        <div className="absolute inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-            <div className="p-6 border-b border-slate-100 flex justify-between items-center">
-              <h3 className="text-xl font-black text-slate-900">{editingProduct ? t('inventory.editProduct') : t('inventory.addNewProduct')}</h3>
-              <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600">
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-white sticky top-0 z-10">
+              <h3 className="text-2xl font-black text-slate-900">{editingProduct ? t('inventory.editProduct') : t('inventory.addNewProduct')}</h3>
+              <button
+                onClick={() => !uploading && setIsModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 transition-colors"
+                disabled={uploading}
+              >
                 <span className="material-symbols-outlined">close</span>
               </button>
             </div>
-            <div className="p-6 space-y-4 overflow-y-auto">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="col-span-2 space-y-1">
-                  <label className="text-xs font-bold text-slate-500 uppercase">Product Name</label>
-                  <input
-                    className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-sm focus:border-primary outline-none"
-                    value={formData.name}
-                    onChange={e => setFormData({ ...formData, name: e.target.value })}
-                  />
-                </div>
 
-                {/* SKU and Barcode Row */}
-                <div className="space-y-1">
-                  <div className="flex justify-between">
-                    <label className="text-xs font-bold text-slate-500 uppercase">SKU</label>
-                    <button onClick={() => setFormData(prev => ({ ...prev, sku: generateRandomSKU(prev.category) }))} className="text-[10px] font-bold text-primary hover:underline flex items-center gap-0.5">
-                      <span className="material-symbols-outlined text-[10px]">refresh</span> Auto
-                    </button>
-                  </div>
-                  <input
-                    className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-sm focus:border-primary outline-none font-mono"
-                    value={formData.sku}
-                    onChange={e => setFormData({ ...formData, sku: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-1">
-                  <div className="flex justify-between">
-                    <label className="text-xs font-bold text-slate-500 uppercase">Barcode</label>
-                    <button onClick={() => setFormData(prev => ({ ...prev, barcode: generateRandomBarcode() }))} className="text-[10px] font-bold text-primary hover:underline flex items-center gap-0.5">
-                      <span className="material-symbols-outlined text-[10px]">refresh</span> Auto
-                    </button>
-                  </div>
-                  <div className="relative">
-                    <span className="material-symbols-outlined absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 text-sm">barcode_scanner</span>
-                    <input
-                      className="w-full bg-slate-50 border border-slate-200 rounded-lg py-2.5 pl-8 pr-2.5 text-sm focus:border-primary outline-none font-mono"
-                      value={formData.barcode}
-                      onChange={e => setFormData({ ...formData, barcode: e.target.value })}
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-500 uppercase">Category</label>
-                  <select
-                    className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-sm focus:border-primary outline-none"
-                    value={formData.category}
-                    onChange={e => setFormData({ ...formData, category: e.target.value })}
+            <div className="p-8 space-y-6 overflow-y-auto">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                {/* Image Upload Column */}
+                <div className="md:col-span-1 space-y-4">
+                  <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Product Image</label>
+                  <div
+                    className="relative group aspect-square rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50 flex flex-col items-center justify-center overflow-hidden hover:border-primary/50 transition-all cursor-pointer"
+                    onClick={() => document.getElementById('imageInput')?.click()}
                   >
-                    {categories.map(cat => (
-                      <option key={cat} value={cat}>{t(`data.categories.${cat}`) || cat}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-500 uppercase">Stock</label>
+                    {imageFile || formData.image ? (
+                      <img
+                        src={imageFile ? URL.createObjectURL(imageFile) : formData.image}
+                        className="w-full h-full object-cover"
+                        alt="Preview"
+                      />
+                    ) : (
+                      <div className="text-center p-4">
+                        <span className="material-symbols-outlined text-4xl text-slate-300 group-hover:text-primary transition-colors">add_photo_alternate</span>
+                        <p className="text-[10px] font-bold text-slate-400 mt-2">Click to upload</p>
+                      </div>
+                    )}
+                    {(imageFile || formData.image) && (
+                      <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all">
+                        <span className="text-white text-xs font-bold px-3 py-1 bg-white/20 backdrop-blur-md rounded-full border border-white/30">Change Photo</span>
+                      </div>
+                    )}
+                  </div>
                   <input
-                    type="number"
-                    className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-sm focus:border-primary outline-none"
-                    value={formData.stock}
-                    onChange={e => setFormData({ ...formData, stock: parseInt(e.target.value) || 0 })}
+                    id="imageInput"
+                    type="file"
+                    className="hidden"
+                    accept="image/*"
+                    onChange={(e) => setImageFile(e.target.files?.[0] || null)}
                   />
+                  <p className="text-[10px] text-slate-400 text-center uppercase font-bold tracking-tight">JPG, PNG, WebP (Max 2MB)</p>
                 </div>
-                {/* Cost and Price Row */}
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-500 uppercase">Unit Cost ($)</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-sm focus:border-primary outline-none"
-                    value={formData.cost}
-                    onChange={e => setFormData({ ...formData, cost: parseFloat(e.target.value) || 0 })}
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-500 uppercase">Unit Price ($)</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-sm focus:border-primary outline-none"
-                    value={formData.price}
-                    onChange={e => setFormData({ ...formData, price: parseFloat(e.target.value) || 0 })}
-                  />
-                </div>
-                <div className="col-span-2 space-y-1">
-                  <label className="text-xs font-bold text-slate-500 uppercase">Subtext / Description</label>
-                  <input
-                    className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-sm focus:border-primary outline-none"
-                    value={formData.sub}
-                    onChange={e => setFormData({ ...formData, sub: e.target.value })}
-                  />
+
+                {/* Form Fields Column */}
+                <div className="md:col-span-2 space-y-6">
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 gap-4">
+                      <div className="space-y-1">
+                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Product Name</label>
+                        <input
+                          className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm font-bold focus:border-primary focus:ring-4 focus:ring-primary/5 outline-none transition-all"
+                          value={formData.name}
+                          onChange={e => setFormData({ ...formData, name: e.target.value })}
+                          placeholder="e.g. Premium Filtered Water 20L"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <div className="flex justify-between">
+                          <label className="text-xs font-black text-slate-400 uppercase tracking-widest">SKU</label>
+                          <button onClick={() => setFormData(prev => ({ ...prev, sku: generateRandomSKU(prev.category) }))} className="text-[10px] font-bold text-primary hover:underline flex items-center gap-0.5">
+                            <span className="material-symbols-outlined text-[10px]">refresh</span> Auto
+                          </button>
+                        </div>
+                        <input
+                          className="w-full bg-slate-100 border-none rounded-xl p-3 text-sm font-mono font-bold focus:ring-2 focus:ring-primary outline-none"
+                          value={formData.sku}
+                          onChange={e => setFormData({ ...formData, sku: e.target.value })}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <div className="flex justify-between">
+                          <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Barcode</label>
+                          <button onClick={() => setFormData(prev => ({ ...prev, barcode: generateRandomBarcode() }))} className="text-[10px] font-bold text-primary hover:underline flex items-center gap-0.5">
+                            <span className="material-symbols-outlined text-[10px]">refresh</span> Auto
+                          </button>
+                        </div>
+                        <input
+                          className="w-full bg-slate-100 border-none rounded-xl p-3 text-sm font-mono font-bold focus:ring-2 focus:ring-primary outline-none"
+                          value={formData.barcode}
+                          onChange={e => setFormData({ ...formData, barcode: e.target.value })}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Category</label>
+                        <select
+                          className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm font-bold focus:border-primary outline-none"
+                          value={formData.category}
+                          onChange={e => setFormData({ ...formData, category: e.target.value })}
+                        >
+                          {categories.map(cat => (
+                            <option key={cat} value={cat}>{getCategoryDisplay(cat)}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Stock Level</label>
+                        <input
+                          type="number"
+                          className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm font-bold focus:border-primary outline-none"
+                          value={formData.stock}
+                          onChange={e => setFormData({ ...formData, stock: parseInt(e.target.value) || 0 })}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Unit Cost ($)</label>
+                        <div className="relative">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">$</span>
+                          <input
+                            type="number"
+                            step="0.01"
+                            className="w-full bg-slate-50 border border-slate-200 rounded-xl py-3 pl-7 pr-3 text-sm font-bold focus:border-primary outline-none"
+                            value={formData.cost}
+                            onChange={e => setFormData({ ...formData, cost: parseFloat(e.target.value) || 0 })}
+                          />
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Selling Price ($)</label>
+                        <div className="relative">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-primary font-black">$</span>
+                          <input
+                            type="number"
+                            step="0.01"
+                            className="w-full bg-primary/5 border border-primary/20 rounded-xl py-3 pl-7 pr-3 text-sm font-black text-primary outline-none"
+                            value={formData.price}
+                            onChange={e => setFormData({ ...formData, price: parseFloat(e.target.value) || 0 })}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
-            <div className="p-6 border-t border-slate-100 bg-slate-50 flex gap-3 justify-end">
-              <button onClick={() => setIsModalOpen(false)} className="px-4 py-2 border border-slate-200 bg-white text-slate-700 font-bold rounded-lg hover:bg-slate-50">{t('inventory.cancel')}</button>
-              <button onClick={handleSave} className="px-6 py-2 bg-primary text-white font-bold rounded-lg hover:brightness-105 shadow-lg shadow-primary/20">{t('inventory.saveProduct')}</button>
+
+            <div className="p-6 border-t border-slate-100 bg-slate-50/50 flex gap-3 justify-end items-center sticky bottom-0">
+              {uploading && (
+                <div className="flex items-center gap-2 mr-auto text-xs font-bold text-slate-500">
+                  <span className="size-4 border-2 border-primary/30 border-t-primary rounded-full animate-spin"></span>
+                  Saving product...
+                </div>
+              )}
+              <button
+                disabled={uploading}
+                onClick={() => setIsModalOpen(false)}
+                className="px-6 py-2.5 text-slate-500 font-bold rounded-xl hover:bg-slate-200 transition-colors disabled:opacity-50"
+              >
+                {t('inventory.cancel')}
+              </button>
+              <button
+                onClick={handleSave}
+                className="px-8 py-2.5 bg-primary text-slate-900 font-black rounded-xl hover:shadow-lg hover:shadow-primary/20 transition-all flex items-center gap-2 disabled:opacity-50"
+                disabled={uploading}
+              >
+                {uploading ? 'Processing...' : t('inventory.saveProduct')}
+                {!uploading && <span className="material-symbols-outlined">save</span>}
+              </button>
             </div>
           </div>
         </div>
@@ -512,11 +624,11 @@ export default function Inventory() {
 
       {/* Category Manager Modal */}
       {isCategoryModalOpen && (
-        <div className="absolute inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden flex flex-col">
+        <div className="fixed inset-0 z-[60] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden flex flex-col">
             <div className="p-6 border-b border-slate-100 flex justify-between items-center">
               <h3 className="text-xl font-black text-slate-900">{t('inventory.manageCategories')}</h3>
-              <button onClick={() => setIsCategoryModalOpen(false)} className="text-slate-400 hover:text-slate-600">
+              <button onClick={() => setIsCategoryModalOpen(false)} className="text-slate-400 hover:text-slate-600 transition-colors">
                 <span className="material-symbols-outlined">close</span>
               </button>
             </div>
@@ -525,23 +637,23 @@ export default function Inventory() {
                 <input
                   value={newCategoryName}
                   onChange={(e) => setNewCategoryName(e.target.value)}
-                  placeholder="New category name..."
-                  className="flex-1 bg-slate-50 border border-slate-200 rounded-lg p-2 text-sm outline-none focus:border-primary"
+                  placeholder="e.g. Premium Accessories"
+                  className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold outline-none focus:border-primary transition-all"
                 />
                 <button
                   onClick={handleAddCategory}
                   disabled={!newCategoryName.trim()}
-                  className="px-4 bg-primary text-white rounded-lg disabled:opacity-50 hover:brightness-105"
+                  className="px-4 bg-primary text-slate-900 font-bold rounded-xl disabled:opacity-50 hover:brightness-105 active:scale-95 transition-all"
                 >
-                  <span className="material-symbols-outlined text-lg">add</span>
+                  <span className="material-symbols-outlined">add</span>
                 </button>
               </div>
-              <div className="space-y-2 max-h-[300px] overflow-y-auto">
+              <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
                 {categories.map(cat => (
-                  <div key={cat} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-100">
-                    <span className="text-sm font-bold text-slate-700">{t(`data.categories.${cat}`) || cat}</span>
-                    <button onClick={() => handleDeleteCategory(cat)} className="text-slate-400 hover:text-red-500">
-                      <span className="material-symbols-outlined text-lg">delete</span>
+                  <div key={cat} className="flex items-center justify-between p-4 bg-white rounded-xl border border-slate-100 hover:border-primary/20 hover:shadow-sm transition-all group">
+                    <span className="text-sm font-black text-slate-700">{getCategoryDisplay(cat)}</span>
+                    <button onClick={() => handleDeleteCategory(cat)} className="text-slate-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100">
+                      <span className="material-symbols-outlined">delete</span>
                     </button>
                   </div>
                 ))}
@@ -565,7 +677,7 @@ const FilterButton = ({ active, onClick, label, color }: any) => {
   return (
     <button
       onClick={onClick}
-      className={`flex items-center gap-2 rounded-full px-4 py-1.5 text-xs font-bold ring-1 ring-inset transition-all ${active
+      className={`flex items-center gap-2 rounded-full px-5 py-2 text-xs font-black ring-1 ring-inset transition-all uppercase tracking-tighter ${active
         ? colorMap[color] + ' shadow-sm'
         : 'text-slate-500 ring-slate-200 bg-white hover:bg-slate-50'
         }`}
@@ -575,59 +687,65 @@ const FilterButton = ({ active, onClick, label, color }: any) => {
   );
 };
 
-const InventoryRow = ({ icon, name, sub, sku, barcode, displayCategory, subCategory, variations, stock, stockColor, cost, price, onEdit, onDelete }: any) => (
-  <tr className="group hover:bg-slate-50 transition-colors">
+const InventoryRow = ({ image, name, sub, sku, barcode, displayCategory, subCategory, stock, stockColor, cost, price, onEdit, onDelete }: any) => (
+  <tr className="group hover:bg-slate-50/80 transition-all border-b border-transparent hover:border-slate-100">
     <td className="px-6 py-4">
-      <div className="flex items-center gap-3">
-        <div className="h-10 w-10 flex-shrink-0 rounded bg-gray-100 flex items-center justify-center border border-gray-200 text-slate-400">
-          <span className="material-symbols-outlined">{icon}</span>
+      <div className="flex items-center gap-4">
+        <div className="h-12 w-12 flex-shrink-0 rounded-xl bg-slate-100 flex items-center justify-center overflow-hidden border border-slate-200">
+          {image ? (
+            <img src={image} className="h-full w-full object-cover" alt={name} />
+          ) : (
+            <span className="material-symbols-outlined text-slate-300 text-2xl">image</span>
+          )}
         </div>
         <div>
-          <div className="font-bold text-slate-900">{name}</div>
-          <div className="text-xs text-slate-500">{sub}</div>
+          <div className="font-black text-slate-900 leading-tight">{name}</div>
+          <div className="text-xs text-slate-400 font-medium truncate max-w-[200px]">{sub || 'No description'}</div>
         </div>
       </div>
     </td>
     <td className="px-6 py-4">
-      <div className="font-mono text-xs text-slate-700 font-bold">{sku}</div>
-      <div className="flex items-center gap-1 text-[10px] text-slate-400">
-        <span className="material-symbols-outlined text-[10px]">barcode_scanner</span>
+      <div className="font-mono text-[11px] text-slate-700 font-black bg-slate-100 w-fit px-2 py-0.5 rounded uppercase">{sku}</div>
+      <div className="flex items-center gap-1 text-[10px] text-slate-400 mt-1 font-bold">
+        <span className="material-symbols-outlined text-[12px]">barcode_scanner</span>
         {barcode || '---'}
       </div>
     </td>
     <td className="px-6 py-4">
-      <div className="flex items-center gap-1 text-xs font-medium text-slate-900">
-        {displayCategory} {subCategory && <><span className="material-symbols-outlined text-sm">chevron_right</span> {subCategory}</>}
+      <div className="text-xs font-black text-slate-600 bg-slate-50 w-fit px-3 py-1 rounded-full border border-slate-100">
+        {displayCategory}
       </div>
     </td>
     <td className="px-6 py-4">
       <div className="flex items-center gap-3">
-        <div className="h-2 w-24 rounded-full bg-gray-100 overflow-hidden">
-          <div className={`h-full rounded-full bg-${stockColor}`} style={{ width: stock === 0 ? '0%' : stock < 20 ? '20%' : '80%' }}></div>
+        <div className="h-2 w-20 rounded-full bg-slate-100 overflow-hidden">
+          <div className={`h-full rounded-full ${stockColor} transition-all duration-1000`} style={{ width: stock === 0 ? '0%' : stock < 20 ? '20%' : '80%' }}></div>
         </div>
-        <span className={`text-sm font-bold ${stock === 0 ? 'text-red-600' : stock <= 20 ? 'text-amber-600' : 'text-emerald-600'}`}>{stock}</span>
+        <span className={`text-sm font-black ${stock === 0 ? 'text-red-600' : stock <= 20 ? 'text-amber-600' : 'text-emerald-600'}`}>{stock}</span>
       </div>
     </td>
-    <td className="px-6 py-4 text-sm font-semibold text-slate-500 tabular-nums">${cost?.toFixed(2) || '0.00'}</td>
-    <td className="px-6 py-4 text-right flex justify-end gap-2">
-      <button onClick={onEdit} className="p-1 text-slate-400 hover:text-primary transition-colors">
-        <span className="material-symbols-outlined">edit</span>
-      </button>
-      <button onClick={onDelete} className="p-1 text-slate-400 hover:text-red-500 transition-colors">
-        <span className="material-symbols-outlined">delete</span>
-      </button>
+    <td className="px-6 py-4 text-sm font-bold text-slate-900 tabular-nums">${price?.toFixed(2) || '0.00'}</td>
+    <td className="px-6 py-4 text-right">
+      <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        <button onClick={onEdit} className="p-2 text-slate-400 hover:text-primary hover:bg-white rounded-lg transition-all shadow-sm">
+          <span className="material-symbols-outlined text-xl">edit</span>
+        </button>
+        <button onClick={onDelete} className="p-2 text-slate-400 hover:text-red-500 hover:bg-white rounded-lg transition-all shadow-sm">
+          <span className="material-symbols-outlined text-xl">delete</span>
+        </button>
+      </div>
     </td>
   </tr>
 );
 
 const StockoutBar = ({ name, days, percent, color, textColor }: any) => (
-  <div className="flex flex-col gap-1">
-    <div className="flex justify-between text-xs font-bold">
-      <span className="truncate max-w-[120px]">{name}</span>
+  <div className="flex flex-col gap-1.5">
+    <div className="flex justify-between text-[11px] font-black uppercase tracking-tight">
+      <span className="truncate max-w-[120px] text-slate-700">{name}</span>
       <span className={textColor}>{days}</span>
     </div>
-    <div className="h-1.5 w-full rounded-full bg-gray-200 overflow-hidden">
-      <div className={`h-full rounded-full ${color}`} style={{ width: percent }}></div>
+    <div className="h-2 w-full rounded-full bg-slate-200/50 overflow-hidden border border-slate-200/20">
+      <div className={`h-full rounded-full ${color} transition-all duration-1000`} style={{ width: percent }}></div>
     </div>
   </div>
 );
