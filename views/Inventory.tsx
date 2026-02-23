@@ -54,10 +54,8 @@ export default function Inventory() {
       const allUnique = Array.from(new Set([...categoryKeys, ...collectionCats]));
       setCategories(allUnique);
     } catch (error: any) {
-      console.error('Error fetching categories for POS:', error);
-      // alert(`Error al cargar categorías en POS: ${error.message}`);
-      // Fallback to defaults if collection missing
-      setCategories(categoryKeys.filter(c => c !== 'All'));
+      console.error('Error fetching categories in Inventory:', error);
+      setCategories(categoryKeys);
     }
   };
 
@@ -723,16 +721,30 @@ export default function Inventory() {
         </div>
       )}
       {/* Debug Status Panel (Temporary) */}
-      <div className="fixed bottom-4 left-4 z-[100] bg-slate-900/90 backdrop-blur-md text-[10px] text-slate-400 p-3 rounded-lg border border-white/10 shadow-2xl space-y-1">
-        <div className="flex items-center gap-2">
-          <div className={`size-1.5 rounded-full ${DATABASE_ID ? 'bg-emerald-500' : 'bg-red-500'}`}></div>
-          <span>DB: {DATABASE_ID || 'MISSING'}</span>
+      <div className="fixed bottom-6 left-6 z-[100] bg-slate-900 border-2 border-primary/30 p-4 rounded-2xl shadow-2xl space-y-2 min-w-[200px]">
+        <div className="text-[10px] font-black text-primary uppercase tracking-tighter mb-2 flex items-center gap-2">
+          <span className="material-symbols-outlined text-xs">analytics</span>
+          Appwrite Config Status
         </div>
-        <div className="flex items-center gap-2">
-          <div className={`size-1.5 rounded-full ${COLLECTION_CATEGORIES_ID ? 'bg-emerald-500' : 'bg-red-500'}`}></div>
-          <span>CATS: {COLLECTION_CATEGORIES_ID || 'MISSING'}</span>
+        <div className="flex items-center justify-between text-xs font-bold text-slate-300">
+          <span>Database ID</span>
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] opacity-60">{DATABASE_ID ? 'OK' : 'ERR'}</span>
+            <div className={`size-2 rounded-full ${DATABASE_ID ? 'bg-emerald-500 shadow-[0_0_8px_theme(colors.emerald.500)]' : 'bg-red-500 shadow-[0_0_8px_theme(colors.red.500)]'}`}></div>
+          </div>
         </div>
-        <div className="text-[8px] opacity-50 pt-1">Verifica tu .env.local / Dokploy Env Vars</div>
+        <div className="flex items-center justify-between text-xs font-bold text-slate-300">
+          <span>Categories ID</span>
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] opacity-60">{COLLECTION_CATEGORIES_ID ? 'OK' : 'MISSING'}</span>
+            <div className={`size-2 rounded-full ${COLLECTION_CATEGORIES_ID ? 'bg-emerald-500 shadow-[0_0_8px_theme(colors.emerald.500)]' : 'bg-red-500 shadow-[0_0_8px_theme(colors.red.500)]'}`}></div>
+          </div>
+        </div>
+        {!COLLECTION_CATEGORIES_ID && (
+          <div className="mt-2 p-2 bg-red-500/10 border border-red-500/20 rounded-lg text-[9px] text-red-400 font-bold leading-tight">
+            ⚠️ FALTA VARIABLE: VITE_APPWRITE_COLLECTION_CATEGORIES_ID en Dokploy Env Vars.
+          </div>
+        )}
       </div>
     </div>
   );
