@@ -3,6 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { AreaChart, Area, XAxis, Tooltip, ResponsiveContainer, CartesianGrid, YAxis } from 'recharts';
 import { useLanguage } from '../LanguageContext';
 import UserMenu from '../UserMenu';
+import { databases, Query } from '@/lib/appwrite';
+
+const DATABASE_ID = import.meta.env.VITE_APPWRITE_DATABASE_ID;
+const COLLECTION_INVENTORY_ID = import.meta.env.VITE_APPWRITE_COLLECTION_INVENTORY_ID;
+const COLLECTION_SALES_ID = import.meta.env.VITE_APPWRITE_COLLECTION_SALES_ID; // Potential next collection
 
 const allTransactions = [
   { id: '#AQ-92831', name: 'Alejandro Morales', initials: 'AM', amount: 1240.55, status: 'Completed', date: 'Today, 14:22' },
@@ -14,42 +19,86 @@ const allTransactions = [
 ];
 
 // Mock Overdue Data (This would ideally come from Customers context)
-const overduePayments = 2; 
+const overduePayments = 2;
 
 export default function Dashboard() {
   const { t } = useLanguage();
   const navigate = useNavigate();
   const [period, setPeriod] = useState<'current' | 'last'>('current');
   const [searchQuery, setSearchQuery] = useState('');
-  const [notifications, setNotifications] = useState(3 + overduePayments);
+  const [loading, setLoading] = useState(true);
+
+  const [transactions, setTransactions] = useState<any[]>([]);
+  const [inventoryStats, setInventoryStats] = useState({ lowStockCount: 0 });
+  const [notifications, setNotifications] = useState(0);
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, []);
+
+  const fetchDashboardData = async () => {
+    if (!DATABASE_ID) {
+      setLoading(false);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      // 1. Fetch Low Stock from Inventory
+      if (COLLECTION_INVENTORY_ID) {
+        const lowStockResponse = await databases.listDocuments(DATABASE_ID, COLLECTION_INVENTORY_ID, [
+          Query.lessThan('stock', 10),
+          Query.limit(1) // Just for count
+        ]);
+        setInventoryStats({ lowStockCount: lowStockResponse.total });
+      }
+
+      // 2. Fetch Recent Transactions
+      if (COLLECTION_SALES_ID) {
+        const salesResponse = await databases.listDocuments(DATABASE_ID, COLLECTION_SALES_ID, [
+          Query.orderDesc('$createdAt'),
+          Query.limit(10)
+        ]);
+        setTransactions(salesResponse.documents);
+      } else {
+        // Fallback mock data if sales collection not yet defined
+        setTransactions(allTransactions);
+      }
+
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Dynamic Chart Data with translations
   const chartData = useMemo(() => {
     const rawData = period === 'current' ? [
-        { name: 'Mon', value: 2400, prev: 2000 },
-        { name: 'Tue', value: 1398, prev: 2200 },
-        { name: 'Wed', value: 9800, prev: 2300 },
-        { name: 'Thu', value: 3908, prev: 2800 },
-        { name: 'Fri', value: 4800, prev: 3100 },
-        { name: 'Sat', value: 3800, prev: 2500 },
-        { name: 'Sun', value: 4300, prev: 3100 },
+      { name: 'Mon', value: 2400, prev: 2000 },
+      { name: 'Tue', value: 1398, prev: 2200 },
+      { name: 'Wed', value: 9800, prev: 2300 },
+      { name: 'Thu', value: 3908, prev: 2800 },
+      { name: 'Fri', value: 4800, prev: 3100 },
+      { name: 'Sat', value: 3800, prev: 2500 },
+      { name: 'Sun', value: 4300, prev: 3100 },
     ] : [
-        { name: 'Mon', value: 2000, prev: 1800 },
-        { name: 'Tue', value: 2200, prev: 1900 },
-        { name: 'Wed', value: 2300, prev: 2100 },
-        { name: 'Thu', value: 2800, prev: 2400 },
-        { name: 'Fri', value: 3100, prev: 2800 },
-        { name: 'Sat', value: 2500, prev: 2200 },
-        { name: 'Sun', value: 3100, prev: 2900 },
+      { name: 'Mon', value: 2000, prev: 1800 },
+      { name: 'Tue', value: 2200, prev: 1900 },
+      { name: 'Wed', value: 2300, prev: 2100 },
+      { name: 'Thu', value: 2800, prev: 2400 },
+      { name: 'Fri', value: 3100, prev: 2800 },
+      { name: 'Sat', value: 2500, prev: 2200 },
+      { name: 'Sun', value: 3100, prev: 2900 },
     ];
 
     return rawData.map(d => ({
-        ...d,
-        name: t(`common.days.${d.name}`) // Translate day name
+      ...d,
+      name: t(`common.days.${d.name}`) // Translate day name
     }));
   }, [period, t]);
-  
+
   const stats = period === 'current' ? {
     sales: "$128,430.00", salesTrend: "+12.5%", salesUp: true,
     profit: "$42,150.55", profitTrend: "+8.2%", profitUp: true,
@@ -61,14 +110,14 @@ export default function Dashboard() {
   };
 
   const filteredTransactions = useMemo(() => {
-    if (!searchQuery) return allTransactions;
+    if (!searchQuery) return transactions;
     const lowerQuery = searchQuery.toLowerCase();
-    return allTransactions.filter(t => 
-      t.name.toLowerCase().includes(lowerQuery) || 
-      t.id.toLowerCase().includes(lowerQuery) ||
-      t.status.toLowerCase().includes(lowerQuery)
+    return transactions.filter(t =>
+      (t.name || '').toLowerCase().includes(lowerQuery) ||
+      (t.$id || t.id || '').toLowerCase().includes(lowerQuery) ||
+      (t.status || '').toLowerCase().includes(lowerQuery)
     );
-  }, [searchQuery]);
+  }, [searchQuery, transactions]);
 
   const togglePeriod = () => {
     setPeriod(prev => prev === 'current' ? 'last' : 'current');
@@ -82,7 +131,7 @@ export default function Dashboard() {
   useEffect(() => {
     const handleClickOutside = () => setActiveMenuId(null);
     if (activeMenuId) {
-        window.addEventListener('click', handleClickOutside);
+      window.addEventListener('click', handleClickOutside);
     }
     return () => window.removeEventListener('click', handleClickOutside);
   }, [activeMenuId]);
@@ -94,17 +143,17 @@ export default function Dashboard() {
         <div className="flex items-center gap-4 flex-1">
           <div className="relative w-full max-w-md">
             <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xl">search</span>
-            <input 
+            <input
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-slate-50 border-none rounded-lg py-2 pl-10 pr-4 text-sm focus:ring-2 focus:ring-primary/50 transition-all placeholder:text-slate-400 outline-none" 
+              className="w-full bg-slate-50 border-none rounded-lg py-2 pl-10 pr-4 text-sm focus:ring-2 focus:ring-primary/50 transition-all placeholder:text-slate-400 outline-none"
               placeholder={t('dashboard.searchPlaceholder')}
-              type="text" 
+              type="text"
             />
           </div>
         </div>
         <div className="flex items-center gap-4">
-          <button 
+          <button
             onClick={clearNotifications}
             className="relative p-2 text-slate-500 hover:bg-slate-100 rounded-full transition-colors"
           >
@@ -127,14 +176,14 @@ export default function Dashboard() {
             <p className="text-slate-500">{t('dashboard.welcomeSubtitle')} {period === 'current' ? t('dashboard.today') : t('dashboard.lastWeek')}.</p>
           </div>
           <div className="flex gap-3">
-            <button 
+            <button
               onClick={togglePeriod}
               className="px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-semibold hover:bg-slate-50 transition-colors flex items-center gap-2 text-slate-700 active:scale-95"
             >
               <span className="material-symbols-outlined text-lg">calendar_today</span>
               {t('dashboard.dateRange')}
             </button>
-            <button 
+            <button
               onClick={() => navigate('/pos')}
               className="px-4 py-2 bg-primary text-white rounded-lg text-sm font-bold shadow-lg shadow-primary/20 hover:brightness-105 transition-all flex items-center gap-2 active:scale-95"
             >
@@ -146,30 +195,30 @@ export default function Dashboard() {
 
         {/* Alerts Section (New) */}
         {overduePayments > 0 && (
-             <div className="bg-red-50 border border-red-100 rounded-xl p-4 flex items-center justify-between animate-pulse">
-                <div className="flex items-center gap-3">
-                    <div className="size-10 rounded-lg bg-red-100 flex items-center justify-center text-red-600">
-                        <span className="material-symbols-outlined">notification_important</span>
-                    </div>
-                    <div>
-                        <h4 className="text-sm font-bold text-slate-900">{t('dashboard.overdueAlert')}</h4>
-                        <p className="text-xs text-red-600">{overduePayments} {t('dashboard.overdueDesc')}</p>
-                    </div>
-                </div>
-                <button 
-                    onClick={() => navigate('/customers')}
-                    className="px-4 py-2 bg-white border border-red-200 text-red-600 text-xs font-bold rounded-lg hover:bg-red-50"
-                >
-                    {t('dashboard.viewCustomers')}
-                </button>
-             </div>
+          <div className="bg-red-50 border border-red-100 rounded-xl p-4 flex items-center justify-between animate-pulse">
+            <div className="flex items-center gap-3">
+              <div className="size-10 rounded-lg bg-red-100 flex items-center justify-center text-red-600">
+                <span className="material-symbols-outlined">notification_important</span>
+              </div>
+              <div>
+                <h4 className="text-sm font-bold text-slate-900">{t('dashboard.overdueAlert')}</h4>
+                <p className="text-xs text-red-600">{overduePayments} {t('dashboard.overdueDesc')}</p>
+              </div>
+            </div>
+            <button
+              onClick={() => navigate('/customers')}
+              className="px-4 py-2 bg-white border border-red-200 text-red-600 text-xs font-bold rounded-lg hover:bg-red-50"
+            >
+              {t('dashboard.viewCustomers')}
+            </button>
+          </div>
         )}
 
         {/* KPI Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <KPICard title={t('dashboard.totalSales')} value={stats.sales} icon="payments" trend={stats.salesTrend} trendUp={stats.salesUp} color="primary" />
           <KPICard title={t('dashboard.netProfit')} value={stats.profit} icon="account_balance_wallet" trend={stats.profitTrend} trendUp={stats.profitUp} color="blue" />
-          <KPICard title={t('dashboard.lowStock')} value={stats.stock} icon="warning" tag={stats.stockStatus} tagColor={stats.stockColor} color="amber" />
+          <KPICard title={t('dashboard.lowStock')} value={`${inventoryStats.lowStockCount} Items`} icon="warning" tag={inventoryStats.lowStockCount > 0 ? "Priority" : "Stable"} tagColor={inventoryStats.lowStockCount > 0 ? "amber" : "slate"} color="amber" />
           <KPICard title={t('dashboard.activeQuotes')} value="28 Open" icon="description" tag="Stable" tagColor="slate" color="purple" />
         </div>
 
@@ -200,7 +249,7 @@ export default function Dashboard() {
                       <stop offset="95%" stopColor="#13daec" stopOpacity={0} />
                     </linearGradient>
                   </defs>
-                  <Tooltip 
+                  <Tooltip
                     contentStyle={{ backgroundColor: '#fff', borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                     itemStyle={{ color: '#0f172a', fontWeight: 'bold' }}
                     cursor={{ stroke: '#94a3b8', strokeWidth: 1 }}
@@ -209,22 +258,22 @@ export default function Dashboard() {
                   <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 12 }} />
                   <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 12 }} prefix="$" />
                   <CartesianGrid vertical={false} stroke="#f1f5f9" />
-                  <Area 
-                    type="monotone" 
-                    dataKey="value" 
-                    stroke="#13daec" 
-                    strokeWidth={3} 
-                    fillOpacity={1} 
-                    fill="url(#colorValue)" 
+                  <Area
+                    type="monotone"
+                    dataKey="value"
+                    stroke="#13daec"
+                    strokeWidth={3}
+                    fillOpacity={1}
+                    fill="url(#colorValue)"
                     animationDuration={1000}
                   />
-                  <Area 
-                    type="monotone" 
-                    dataKey="prev" 
-                    stroke="#e2e8f0" 
-                    strokeDasharray="5 5" 
-                    strokeWidth={2} 
-                    fill="none" 
+                  <Area
+                    type="monotone"
+                    dataKey="prev"
+                    stroke="#e2e8f0"
+                    strokeDasharray="5 5"
+                    strokeWidth={2}
+                    fill="none"
                     animationDuration={1000}
                   />
                 </AreaChart>
@@ -247,7 +296,7 @@ export default function Dashboard() {
                   <p className="text-xs text-slate-500 leading-relaxed">
                     "Organic Coffee Beans" sales increased by 22% this week. Current stock will only last 3 more days.
                   </p>
-                  <button 
+                  <button
                     onClick={() => navigate('/inventory')}
                     className="mt-3 text-xs font-bold text-primary hover:underline flex items-center gap-1"
                   >
@@ -261,7 +310,7 @@ export default function Dashboard() {
                   </p>
                 </div>
               </div>
-              <button 
+              <button
                 onClick={() => navigate('/ai')}
                 className="mt-6 w-full py-2.5 bg-slate-900 text-white text-xs font-bold rounded-lg hover:opacity-90 transition-opacity"
               >
@@ -278,7 +327,7 @@ export default function Dashboard() {
               <h4 className="text-lg font-bold text-slate-900">{t('dashboard.recentTx')}</h4>
               <p className="text-sm text-slate-500">Real-time update of store activity</p>
             </div>
-            <button 
+            <button
               onClick={() => navigate('/sales')}
               className="text-sm font-bold text-primary hover:underline"
             >
@@ -300,22 +349,22 @@ export default function Dashboard() {
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {filteredTransactions.map((tx) => (
-                    <TransactionRow 
+                    <TransactionRow
                       key={tx.id}
-                      id={tx.id} 
-                      name={tx.name} 
-                      initials={tx.initials} 
-                      amount={`$${tx.amount.toFixed(2)}`} 
+                      id={tx.id}
+                      name={tx.name}
+                      initials={tx.initials}
+                      amount={`$${tx.amount.toFixed(2)}`}
                       status={t(`common.status.${tx.status}`)}
                       rawStatus={tx.status}
                       date={tx.date}
                       isMenuOpen={activeMenuId === tx.id}
                       onToggleMenu={() => setActiveMenuId(activeMenuId === tx.id ? null : tx.id)}
                       labels={{
-                          view: t('dashboard.actions.viewDetails'),
-                          print: t('dashboard.actions.printReceipt'),
-                          email: t('dashboard.actions.sendEmail'),
-                          refund: t('dashboard.actions.refund')
+                        view: t('dashboard.actions.viewDetails'),
+                        print: t('dashboard.actions.printReceipt'),
+                        email: t('dashboard.actions.sendEmail'),
+                        refund: t('dashboard.actions.refund')
                       }}
                       onNavigate={() => navigate('/sales')}
                     />
@@ -393,42 +442,42 @@ const TransactionRow = ({ id, name, initials, amount, status, rawStatus, date, i
       </td>
       <td className="px-6 py-4 text-sm text-slate-500">{date}</td>
       <td className="px-6 py-4 text-right relative">
-        <button 
-            onClick={(e) => {
-                e.stopPropagation();
-                onToggleMenu();
-            }}
-            className={`p-1.5 rounded-lg transition-colors ${isMenuOpen ? 'bg-slate-200 text-slate-900' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100'}`}
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleMenu();
+          }}
+          className={`p-1.5 rounded-lg transition-colors ${isMenuOpen ? 'bg-slate-200 text-slate-900' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100'}`}
         >
-            <span className="material-symbols-outlined">more_vert</span>
+          <span className="material-symbols-outlined">more_vert</span>
         </button>
 
         {/* Dropdown Menu */}
         {isMenuOpen && (
-            <div 
-                onClick={(e) => e.stopPropagation()} 
-                className="absolute right-8 top-8 w-48 bg-white rounded-xl shadow-xl border border-slate-100 z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-100"
-            >
-                <div className="py-1">
-                    <button onClick={() => alert('View Details clicked')} className="w-full text-left px-4 py-2.5 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium flex items-center gap-2">
-                        <span className="material-symbols-outlined text-lg text-slate-400">visibility</span>
-                        {labels.view}
-                    </button>
-                    <button onClick={() => alert('Print Receipt clicked')} className="w-full text-left px-4 py-2.5 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium flex items-center gap-2">
-                        <span className="material-symbols-outlined text-lg text-slate-400">print</span>
-                        {labels.print}
-                    </button>
-                    <button onClick={() => alert('Email Receipt clicked')} className="w-full text-left px-4 py-2.5 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium flex items-center gap-2">
-                        <span className="material-symbols-outlined text-lg text-slate-400">mail</span>
-                        {labels.email}
-                    </button>
-                    <div className="h-px bg-slate-100 my-1"></div>
-                    <button onClick={() => alert('Refund clicked')} className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 font-bold flex items-center gap-2">
-                        <span className="material-symbols-outlined text-lg">undo</span>
-                        {labels.refund}
-                    </button>
-                </div>
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="absolute right-8 top-8 w-48 bg-white rounded-xl shadow-xl border border-slate-100 z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-100"
+          >
+            <div className="py-1">
+              <button onClick={() => alert('View Details clicked')} className="w-full text-left px-4 py-2.5 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium flex items-center gap-2">
+                <span className="material-symbols-outlined text-lg text-slate-400">visibility</span>
+                {labels.view}
+              </button>
+              <button onClick={() => alert('Print Receipt clicked')} className="w-full text-left px-4 py-2.5 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium flex items-center gap-2">
+                <span className="material-symbols-outlined text-lg text-slate-400">print</span>
+                {labels.print}
+              </button>
+              <button onClick={() => alert('Email Receipt clicked')} className="w-full text-left px-4 py-2.5 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium flex items-center gap-2">
+                <span className="material-symbols-outlined text-lg text-slate-400">mail</span>
+                {labels.email}
+              </button>
+              <div className="h-px bg-slate-100 my-1"></div>
+              <button onClick={() => alert('Refund clicked')} className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 font-bold flex items-center gap-2">
+                <span className="material-symbols-outlined text-lg">undo</span>
+                {labels.refund}
+              </button>
             </div>
+          </div>
         )}
       </td>
     </tr>

@@ -1,27 +1,63 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useLanguage } from '../LanguageContext';
 import UserMenu from '../UserMenu';
+import { databases, Query } from '@/lib/appwrite';
 
-// Mock Transaction Data
-const allTransactions = [
-  { id: '#TR-55095', name: 'Mariana Castro', initials: 'MC', method: 'Cash', methodIcon: 'payments', amount: 452.10, date: 'Nov 01, 2024 • 16:45', timestamp: 1730479500000, color: 'slate' },
-  { id: '#TR-55094', name: 'Jorge Rodriguez', initials: 'JR', method: 'Stripe', methodIcon: 'credit_card', amount: 1200.00, date: 'Nov 01, 2024 • 15:20', timestamp: 1730474400000, color: 'blue' },
-  { id: '#TR-55093', name: 'Ana Valenzuela', initials: 'AV', method: 'QR Pay', methodIcon: 'qr_code_2', amount: 88.45, date: 'Nov 01, 2024 • 14:12', timestamp: 1730470320000, color: 'purple' },
-  { id: '#TR-55092', name: 'Guest #4812', initials: 'GH', method: 'Cash', methodIcon: 'payments', amount: 12.50, date: 'Nov 01, 2024 • 13:58', timestamp: 1730469480000, color: 'slate' },
-  { id: '#TR-55091', name: 'Carlos Ruiz', initials: 'CR', method: 'Card', methodIcon: 'credit_card', amount: 320.00, date: 'Oct 31, 2024 • 18:30', timestamp: 1730400600000, color: 'blue' },
-  { id: '#TR-55090', name: 'Sofia Lopez', initials: 'SL', method: 'Cash', methodIcon: 'payments', amount: 65.00, date: 'Oct 31, 2024 • 11:15', timestamp: 1730374500000, color: 'slate' },
-  { id: '#TR-55089', name: 'Hotel Grand Central', initials: 'HG', method: 'Transfer', methodIcon: 'account_balance', amount: 2450.00, date: 'Oct 30, 2024 • 09:45', timestamp: 1730281500000, color: 'purple' },
-  { id: '#TR-55088', name: 'Luisa Fernanda', initials: 'LF', method: 'Card', methodIcon: 'credit_card', amount: 145.20, date: 'Oct 30, 2024 • 14:20', timestamp: 1730298000000, color: 'blue' },
-];
+const DATABASE_ID = import.meta.env.VITE_APPWRITE_DATABASE_ID;
+const COLLECTION_ID = import.meta.env.VITE_APPWRITE_COLLECTION_SALES_ID;
+
+// Legacy mock items removed
+const allTransactionsFallback: any[] = [];
 
 export default function Sales() {
   const { t } = useLanguage();
+  const [transactions, setTransactions] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [dateRange, setDateRange] = useState<'Today' | 'Week'>('Today');
 
+  useEffect(() => {
+    fetchSales();
+  }, [dateRange]);
+
+  const fetchSales = async () => {
+    if (!DATABASE_ID || !COLLECTION_ID) {
+      setLoading(false);
+      return;
+    }
+    try {
+      setLoading(true);
+      const queries = [Query.orderDesc('$createdAt')];
+
+      // Simple mock of time filtering for the demo
+      if (dateRange === 'Today') {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        queries.push(Query.greaterThanEqual('$createdAt', today.toISOString()));
+      }
+
+      const response = await databases.listDocuments(DATABASE_ID, COLLECTION_ID, queries);
+      setTransactions(response.documents.map(doc => ({
+        ...doc,
+        id: doc.$id,
+        name: doc.customerId || 'Guest',
+        initials: (doc.customerId || 'G').substring(0, 2).toUpperCase(),
+        method: doc.paymentMethod || 'Cash',
+        methodIcon: doc.paymentMethod === 'Card' ? 'credit_card' : 'payments',
+        amount: doc.total || 0,
+        date: new Date(doc.date || doc.$createdAt).toLocaleString(),
+        color: doc.paymentMethod === 'Card' ? 'blue' : 'slate'
+      })));
+    } catch (error) {
+      console.error('Error fetching sales:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Filter Logic
   const filteredData = useMemo(() => {
-    let data = allTransactions;
+    let data = transactions;
 
     // Filter by Date (Mock logic using timestamp cutoff)
     const todayStart = 1730438400000; // Approx start of Nov 1st 2024 for demo
@@ -32,8 +68,8 @@ export default function Sales() {
     // Filter by Search
     if (searchQuery) {
       const lowerQuery = searchQuery.toLowerCase();
-      data = data.filter(t => 
-        t.name.toLowerCase().includes(lowerQuery) || 
+      data = data.filter(t =>
+        t.name.toLowerCase().includes(lowerQuery) ||
         t.id.toLowerCase().includes(lowerQuery)
       );
     }
@@ -66,12 +102,12 @@ export default function Sales() {
         <div className="flex items-center gap-4 flex-1">
           <div className="relative w-full max-w-md">
             <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xl">search</span>
-            <input 
+            <input
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-slate-50 border-none rounded-lg py-2 pl-10 pr-4 text-sm focus:ring-2 focus:ring-primary/50 transition-all placeholder:text-slate-400 outline-none" 
+              className="w-full bg-slate-50 border-none rounded-lg py-2 pl-10 pr-4 text-sm focus:ring-2 focus:ring-primary/50 transition-all placeholder:text-slate-400 outline-none"
               placeholder={t('sales.searchPlaceholder')}
-              type="text" 
+              type="text"
             />
           </div>
         </div>
@@ -91,7 +127,7 @@ export default function Sales() {
           <div className="flex flex-wrap items-center gap-3">
             <div className="flex flex-col gap-1.5">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">{t('sales.dateRange')}</span>
-              <button 
+              <button
                 onClick={() => setDateRange(prev => prev === 'Today' ? 'Week' : 'Today')}
                 className="px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-semibold hover:bg-slate-50 transition-colors flex items-center gap-2 min-w-[180px]"
               >
@@ -100,7 +136,7 @@ export default function Sales() {
               </button>
             </div>
             <div className="flex flex-col gap-1.5 self-end">
-              <button 
+              <button
                 onClick={handleExport}
                 className="px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-semibold hover:bg-slate-50 transition-colors flex items-center gap-2"
               >
@@ -128,14 +164,14 @@ export default function Sales() {
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {filteredData.map(tx => (
-                      <SalesRow 
+                      <SalesRow
                         key={tx.id}
-                        id={tx.id} 
-                        name={tx.name} 
-                        initials={tx.initials} 
-                        method={tx.method} 
-                        methodIcon={tx.methodIcon} 
-                        amount={`$${tx.amount.toFixed(2)}`} 
+                        id={tx.id}
+                        name={tx.name}
+                        initials={tx.initials}
+                        method={tx.method}
+                        methodIcon={tx.methodIcon}
+                        amount={`$${tx.amount.toFixed(2)}`}
                         time={tx.date}
                         color={tx.color}
                       />
@@ -225,31 +261,31 @@ export default function Sales() {
 }
 
 const SalesRow = ({ id, name, initials, method, methodIcon, amount, time, color = 'slate' }: any) => {
-    const badgeColors: any = {
-        slate: 'bg-slate-100 text-slate-600',
-        blue: 'bg-blue-50 text-blue-600',
-        purple: 'bg-purple-50 text-purple-600'
-    };
-    
-    return (
-        <tr className="hover:bg-slate-50 transition-colors">
-            <td className="px-6 py-4 text-sm font-bold text-slate-700">{id}</td>
-            <td className="px-6 py-4">
-            <div className="flex items-center gap-3">
-                <div className={`size-8 rounded-full flex items-center justify-center text-xs font-bold ${color === 'blue' ? 'bg-blue-100 text-blue-600' : color === 'purple' ? 'bg-purple-100 text-purple-600' : 'bg-primary/10 text-primary'}`}>{initials}</div>
-                <span className="text-sm font-medium text-slate-900">{name}</span>
-            </div>
-            </td>
-            <td className="px-6 py-4 text-center">
-            <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold ${badgeColors[color]}`}>
-                <span className="material-symbols-outlined text-sm">{methodIcon}</span> {method}
-            </span>
-            </td>
-            <td className="px-6 py-4 text-sm font-bold text-slate-900">{amount}</td>
-            <td className="px-6 py-4 text-sm text-slate-500">{time}</td>
-            <td className="px-6 py-4 text-right">
-            <button className="material-symbols-outlined text-slate-400 hover:text-slate-600">visibility</button>
-            </td>
-        </tr>
-    );
+  const badgeColors: any = {
+    slate: 'bg-slate-100 text-slate-600',
+    blue: 'bg-blue-50 text-blue-600',
+    purple: 'bg-purple-50 text-purple-600'
+  };
+
+  return (
+    <tr className="hover:bg-slate-50 transition-colors">
+      <td className="px-6 py-4 text-sm font-bold text-slate-700">{id}</td>
+      <td className="px-6 py-4">
+        <div className="flex items-center gap-3">
+          <div className={`size-8 rounded-full flex items-center justify-center text-xs font-bold ${color === 'blue' ? 'bg-blue-100 text-blue-600' : color === 'purple' ? 'bg-purple-100 text-purple-600' : 'bg-primary/10 text-primary'}`}>{initials}</div>
+          <span className="text-sm font-medium text-slate-900">{name}</span>
+        </div>
+      </td>
+      <td className="px-6 py-4 text-center">
+        <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold ${badgeColors[color]}`}>
+          <span className="material-symbols-outlined text-sm">{methodIcon}</span> {method}
+        </span>
+      </td>
+      <td className="px-6 py-4 text-sm font-bold text-slate-900">{amount}</td>
+      <td className="px-6 py-4 text-sm text-slate-500">{time}</td>
+      <td className="px-6 py-4 text-right">
+        <button className="material-symbols-outlined text-slate-400 hover:text-slate-600">visibility</button>
+      </td>
+    </tr>
+  );
 }
