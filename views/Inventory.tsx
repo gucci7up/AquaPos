@@ -254,8 +254,9 @@ export default function Inventory() {
       if (DATABASE_ID && COLLECTION_CATEGORIES_ID) {
         try {
           await databases.createDocument(DATABASE_ID, COLLECTION_CATEGORIES_ID, ID.unique(), { name });
-        } catch (error) {
+        } catch (error: any) {
           console.error('Error saving category to Appwrite:', error);
+          alert(`No se pudo guardar la categoría en Appwrite: ${error.message}. Asegúrate de haber creado la colección "categories" con el atributo "name" y los permisos para "Any".`);
         }
       }
     }
@@ -275,8 +276,9 @@ export default function Inventory() {
           if (response.documents.length > 0) {
             await databases.deleteDocument(DATABASE_ID, COLLECTION_CATEGORIES_ID, response.documents[0].$id);
           }
-        } catch (error) {
+        } catch (error: any) {
           console.error('Error deleting category from Appwrite:', error);
+          alert(`Error al borrar categoría de Appwrite: ${error.message}`);
         }
       }
     }
