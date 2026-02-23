@@ -13,6 +13,14 @@ export default function Auth() {
     const [name, setName] = useState('');
     const [error, setError] = useState<string | null>(null);
 
+    const [showConfig, setShowConfig] = useState(false);
+
+    const checkConfig = () => {
+        const endpoint = import.meta.env.VITE_APPWRITE_ENDPOINT;
+        const project = import.meta.env.VITE_APPWRITE_PROJECT_ID;
+        alert(`Endpoint: ${endpoint}\nProject: ${project}`);
+    };
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
@@ -26,7 +34,11 @@ export default function Auth() {
             navigate('/dashboard');
         } catch (err: any) {
             console.error('Auth Error:', err);
-            setError(err.message || 'Authentication failed');
+            if (err.message === 'Failed to fetch' || err.name === 'TypeError') {
+                setError('Network Error: Failed to connect to Appwrite. Please verify your SSL/CORS settings and if your domain is added to Appwrite Platforms.');
+            } else {
+                setError(err.message || 'Authentication failed');
+            }
         } finally {
             setLoading(false);
         }
@@ -59,7 +71,13 @@ export default function Auth() {
 
             {/* Right Side - Form */}
             <div className="w-full lg:w-1/2 flex flex-col justify-center px-8 sm:px-16 lg:px-24 py-12 relative bg-white">
-                <div className="absolute top-8 right-8">
+                <div className="absolute top-8 right-8 flex gap-2">
+                    <button
+                        onClick={checkConfig}
+                        className="text-[10px] font-bold uppercase text-slate-300 hover:text-slate-500 border border-slate-100 rounded px-2 py-1.5 transition-colors"
+                    >
+                        DEBUG
+                    </button>
                     <button
                         onClick={() => setLanguage(language === 'en' ? 'es' : 'en')}
                         className="text-xs font-bold uppercase text-slate-400 hover:text-slate-900 border border-slate-200 rounded px-3 py-1.5 transition-colors"
