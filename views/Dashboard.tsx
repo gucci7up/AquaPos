@@ -9,17 +9,8 @@ const DATABASE_ID = import.meta.env.VITE_APPWRITE_DATABASE_ID;
 const COLLECTION_INVENTORY_ID = import.meta.env.VITE_APPWRITE_COLLECTION_INVENTORY_ID;
 const COLLECTION_SALES_ID = import.meta.env.VITE_APPWRITE_COLLECTION_SALES_ID; // Potential next collection
 
-const allTransactions = [
-  { id: '#AQ-92831', name: 'Alejandro Morales', initials: 'AM', amount: 1240.55, status: 'Completed', date: 'Today, 14:22' },
-  { id: '#AQ-92830', name: 'Lucia Gomez', initials: 'LG', amount: 85.20, status: 'Pending', date: 'Today, 13:45' },
-  { id: '#AQ-92829', name: 'Roberto Hernandez', initials: 'RH', amount: 342.11, status: 'Shipped', date: 'Today, 11:20' },
-  { id: '#AQ-92828', name: 'Elena Suarez', initials: 'ES', amount: 2100.00, status: 'Completed', date: 'Yesterday, 17:50' },
-  { id: '#AQ-92827', name: 'Carlos Ruiz', initials: 'CR', amount: 120.00, status: 'Completed', date: 'Yesterday, 16:30' },
-  { id: '#AQ-92826', name: 'Maria Lopez', initials: 'ML', amount: 450.50, status: 'Pending', date: 'Yesterday, 14:15' },
-];
-
 // Mock Overdue Data (This would ideally come from Customers context)
-const overduePayments = 2;
+const overduePayments = 0;
 
 export default function Dashboard() {
   const { t } = useLanguage();
@@ -73,16 +64,14 @@ export default function Dashboard() {
         try {
           const salesResponse = await databases.listDocuments(DATABASE_ID, COLLECTION_SALES_ID, [
             Query.orderDesc('$createdAt'),
-            Query.limit(10)
+            Query.limit(50) // Fetch more for better stats
           ]);
           setTransactions(salesResponse.documents);
         } catch (salesErr) {
-          console.warn('Could not fetch sales:', salesErr);
-          setTransactions(allTransactions);
+          setTransactions([]);
         }
       } else {
-        // Fallback mock data if sales collection not yet defined
-        setTransactions(allTransactions);
+        setTransactions([]);
       }
 
     } catch (error) {
@@ -92,41 +81,45 @@ export default function Dashboard() {
     }
   };
 
-  // Dynamic Chart Data with translations
+  // Dynamic Chart Data mapping real sales to days
   const chartData = useMemo(() => {
-    const rawData = period === 'current' ? [
-      { name: 'Mon', value: 2400, prev: 2000 },
-      { name: 'Tue', value: 1398, prev: 2200 },
-      { name: 'Wed', value: 9800, prev: 2300 },
-      { name: 'Thu', value: 3908, prev: 2800 },
-      { name: 'Fri', value: 4800, prev: 3100 },
-      { name: 'Sat', value: 3800, prev: 2500 },
-      { name: 'Sun', value: 4300, prev: 3100 },
-    ] : [
-      { name: 'Mon', value: 2000, prev: 1800 },
-      { name: 'Tue', value: 2200, prev: 1900 },
-      { name: 'Wed', value: 2300, prev: 2100 },
-      { name: 'Thu', value: 2800, prev: 2400 },
-      { name: 'Fri', value: 3100, prev: 2800 },
-      { name: 'Sat', value: 2500, prev: 2200 },
-      { name: 'Sun', value: 3100, prev: 2900 },
-    ];
+    // Initialize days
+    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    const dataMap: any = {};
+    days.forEach(d => dataMap[d] = { value: 0, prev: 0 });
 
-    return rawData.map(d => ({
-      ...d,
-      name: t(`common.days.${d.name}`) // Translate day name
+    // Populate with real data if available
+    transactions.forEach((tx: any) => {
+      const date = new Date(tx.$createdAt || tx.date);
+      const dayName = days[(date.getDay() + 6) % 7]; // Adjusted for Mon-Sun
+      if (dataMap[dayName]) {
+        dataMap[dayName].value += tx.total || 0;
+      }
+    });
+
+    return days.map(d => ({
+      name: t(`common.days.${d}`),
+      value: dataMap[d].value,
+      prev: 0
     }));
-  }, [period, t]);
+  }, [transactions, t]);
 
-  const stats = period === 'current' ? {
-    sales: "$128,430.00", salesTrend: "+12.5%", salesUp: true,
-    profit: "$42,150.55", profitTrend: "+8.2%", profitUp: true,
-    stock: "14 Items", stockStatus: "Priority", stockColor: "amber"
-  } : {
-    sales: "$110,200.00", salesTrend: "-5.4%", salesUp: false,
-    profit: "$38,900.00", profitTrend: "-2.1%", profitUp: false,
-    stock: "8 Items", stockStatus: "Stable", stockColor: "slate"
-  };
+  const stats = useMemo(() => {
+    const totalSales = transactions.reduce((acc, tx) => acc + (tx.total || 0), 0);
+    const totalProfit = totalSales * 0.35; // Example 35% margin until real cost tracking is in 
+
+    return {
+      sales: `$${totalSales.toLocaleString()}`,
+      salesTrend: totalSales > 0 ? "+100%" : "0%",
+      salesUp: totalSales > 0,
+      profit: `$${totalProfit.toLocaleString()}`,
+      profitTrend: totalProfit > 0 ? "+100%" : "0%",
+      profitUp: totalProfit > 0,
+      stock: `${inventoryStats.lowStockCount} Items`,
+      stockStatus: inventoryStats.lowStockCount > 0 ? "Priority" : "Stable",
+      stockColor: inventoryStats.lowStockCount > 0 ? "amber" : "slate"
+    };
+  }, [transactions, inventoryStats]);
 
   const filteredTransactions = useMemo(() => {
     if (!searchQuery) return transactions;
@@ -312,24 +305,34 @@ export default function Dashboard() {
                 <h4 className="font-bold text-slate-900">{t('dashboard.aiInsights')}</h4>
               </div>
               <div className="space-y-6 flex-1">
-                <div className="p-4 bg-primary/5 rounded-lg border border-primary/10">
-                  <p className="text-sm font-semibold text-slate-800 mb-1">{t('dashboard.inventoryWarning')}</p>
-                  <p className="text-xs text-slate-500 leading-relaxed">
-                    "Organic Coffee Beans" sales increased by 22% this week. Current stock will only last 3 more days.
-                  </p>
-                  <button
-                    onClick={() => navigate('/inventory')}
-                    className="mt-3 text-xs font-bold text-primary hover:underline flex items-center gap-1"
-                  >
-                    {t('dashboard.restock')} <span className="material-symbols-outlined text-sm">arrow_forward</span>
-                  </button>
-                </div>
-                <div className="p-4 bg-slate-50 rounded-lg border border-slate-100">
-                  <p className="text-sm font-semibold text-slate-800 mb-1">{t('dashboard.peakHours')}</p>
-                  <p className="text-xs text-slate-500 leading-relaxed">
-                    Fridays 2 PM - 5 PM are your busiest. Consider adding a staff member to the POS.
-                  </p>
-                </div>
+                {transactions.length > 5 ? (
+                  <>
+                    <div className="p-4 bg-primary/5 rounded-lg border border-primary/10">
+                      <p className="text-sm font-semibold text-slate-800 mb-1">{t('dashboard.inventoryWarning')}</p>
+                      <p className="text-xs text-slate-500 leading-relaxed">
+                        Analizando tendencias de venta... Revisa el inventario para optimizar stock.
+                      </p>
+                      <button
+                        onClick={() => navigate('/inventory')}
+                        className="mt-3 text-xs font-bold text-primary hover:underline flex items-center gap-1"
+                      >
+                        {t('dashboard.restock')} <span className="material-symbols-outlined text-sm">arrow_forward</span>
+                      </button>
+                    </div>
+                    <div className="p-4 bg-slate-50 rounded-lg border border-slate-100">
+                      <p className="text-sm font-semibold text-slate-800 mb-1">{t('dashboard.peakHours')}</p>
+                      <p className="text-xs text-slate-500 leading-relaxed">
+                        Pronto verás aquí tus horas de mayor actividad para optimizar tu personal.
+                      </p>
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex flex-col items-center justify-center h-full text-center p-4">
+                    <span className="material-symbols-outlined text-4xl text-slate-200 mb-2">query_stats</span>
+                    <p className="text-sm font-bold text-slate-400">AquaAI está aprendiendo de tu negocio</p>
+                    <p className="text-xs text-slate-400 mt-1">Realiza más ventas para generar insights inteligentes.</p>
+                  </div>
+                )}
               </div>
               <button
                 onClick={() => navigate('/ai')}
