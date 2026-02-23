@@ -54,9 +54,10 @@ export default function Inventory() {
       const allUnique = Array.from(new Set([...categoryKeys, ...collectionCats]));
       setCategories(allUnique);
     } catch (error: any) {
-      console.error('Error fetching categories:', error);
-      // If collection doesn't exist yet, we still show defaults
-      setCategories(categoryKeys);
+      console.error('Error fetching categories for POS:', error);
+      // alert(`Error al cargar categorías en POS: ${error.message}`);
+      // Fallback to defaults if collection missing
+      setCategories(categoryKeys.filter(c => c !== 'All'));
     }
   };
 
@@ -721,6 +722,18 @@ export default function Inventory() {
           </div>
         </div>
       )}
+      {/* Debug Status Panel (Temporary) */}
+      <div className="fixed bottom-4 left-4 z-[100] bg-slate-900/90 backdrop-blur-md text-[10px] text-slate-400 p-3 rounded-lg border border-white/10 shadow-2xl space-y-1">
+        <div className="flex items-center gap-2">
+          <div className={`size-1.5 rounded-full ${DATABASE_ID ? 'bg-emerald-500' : 'bg-red-500'}`}></div>
+          <span>DB: {DATABASE_ID || 'MISSING'}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className={`size-1.5 rounded-full ${COLLECTION_CATEGORIES_ID ? 'bg-emerald-500' : 'bg-red-500'}`}></div>
+          <span>CATS: {COLLECTION_CATEGORIES_ID || 'MISSING'}</span>
+        </div>
+        <div className="text-[8px] opacity-50 pt-1">Verifica tu .env.local / Dokploy Env Vars</div>
+      </div>
     </div>
   );
 }
