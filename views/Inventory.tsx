@@ -192,6 +192,7 @@ export default function Inventory() {
 
       await fetchProducts(); // Refresh list
       setIsModalOpen(false);
+      setImageFile(null); // Reset file input
     } catch (error: any) {
       console.error('Error saving product:', error);
       let errorMsg = error.message || 'Check console / credentials.';

@@ -18,7 +18,6 @@ export default function POS() {
 
   // helper to get category display name
   const getCategoryDisplay = (cat: string) => {
-    if (cat === 'All') return t('inventory.allCategories');
     const key = `data.categories.${cat}`;
     const translation = t(key);
     return translation === key ? cat : translation;

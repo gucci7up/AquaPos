@@ -91,16 +91,26 @@ export default function Suppliers() {
 
         setLoading(true);
         try {
+            const submissionData = {
+                name: supplierForm.name,
+                contact: supplierForm.contact,
+                email: supplierForm.email,
+                phone: supplierForm.phone,
+                category: supplierForm.category,
+                leadTime: supplierForm.leadTime,
+                address: supplierForm.address
+            };
+
             if (editingSupplierId) {
-                await databases.updateDocument(DATABASE_ID, COLLECTION_SUPPLIERS_ID, String(editingSupplierId), supplierForm);
+                await databases.updateDocument(DATABASE_ID, COLLECTION_SUPPLIERS_ID, String(editingSupplierId), submissionData);
             } else {
-                await databases.createDocument(DATABASE_ID, COLLECTION_SUPPLIERS_ID, ID.unique(), supplierForm);
+                await databases.createDocument(DATABASE_ID, COLLECTION_SUPPLIERS_ID, ID.unique(), submissionData);
             }
             await fetchInitialData();
             setIsSupplierModalOpen(false);
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error saving supplier:', error);
-            alert('Failed to save supplier.');
+            alert('Failed to save supplier: ' + (error.message || 'Check console'));
         } finally {
             setLoading(false);
         }

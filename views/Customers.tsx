@@ -94,22 +94,33 @@ export default function Customers() {
 
     setLoading(true);
     try {
+      const submissionData: any = {
+        name: formData.name,
+        email: formData.email,
+        phone: formData.phone,
+        tier: formData.tier,
+        status: formData.status,
+        notes: formData.notes,
+      };
+
       if (editingCustomer) {
-        await databases.updateDocument(DATABASE_ID, COLLECTION_ID, editingCustomer.$id || editingCustomer.id, formData);
+        // When editing, we don't necessarily update ltv and credit here unless explicitly asked
+        // But we must NOT include fields unknown to Appwrite like 'id' or 'image' if it's not a real attribute
+        await databases.updateDocument(DATABASE_ID, COLLECTION_ID, editingCustomer.$id || editingCustomer.id, submissionData);
       } else {
         const newDoc = {
-          ...formData,
+          ...submissionData,
           ltv: 0,
           credit: 0,
-          lastActive: 'Just now',
+          image: `https://ui-avatars.com/api/?background=random&name=${encodeURIComponent(formData.name)}`
         };
         await databases.createDocument(DATABASE_ID, COLLECTION_ID, ID.unique(), newDoc);
       }
       await fetchCustomers();
       setIsModalOpen(false);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving customer:', error);
-      alert('Failed to save customer.');
+      alert('Failed to save customer: ' + (error.message || 'Check console'));
     } finally {
       setLoading(false);
     }
