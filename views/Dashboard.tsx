@@ -47,27 +47,37 @@ export default function Dashboard() {
       setLoading(true);
       // 1. Fetch Low Stock from Inventory
       if (COLLECTION_INVENTORY_ID) {
-        const lowStockResponse = await databases.listDocuments(DATABASE_ID, COLLECTION_INVENTORY_ID, [
-          Query.lessThan('stock', 10),
-          Query.limit(1) // Just for count
-        ]);
-        setInventoryStats({ lowStockCount: lowStockResponse.total });
+        try {
+          const lowStockResponse = await databases.listDocuments(DATABASE_ID, COLLECTION_INVENTORY_ID, [
+            Query.lessThan('stock', 10),
+            Query.limit(1)
+          ]);
+          setInventoryStats({ lowStockCount: lowStockResponse.total });
+        } catch (invErr) {
+          console.warn('Could not fetch stock alerts (attribute "stock" might be missing):', invErr);
+          setInventoryStats({ lowStockCount: 0 });
+        }
       }
 
       // 2. Fetch Recent Transactions
       if (COLLECTION_SALES_ID) {
-        const salesResponse = await databases.listDocuments(DATABASE_ID, COLLECTION_SALES_ID, [
-          Query.orderDesc('$createdAt'),
-          Query.limit(10)
-        ]);
-        setTransactions(salesResponse.documents);
+        try {
+          const salesResponse = await databases.listDocuments(DATABASE_ID, COLLECTION_SALES_ID, [
+            Query.orderDesc('$createdAt'),
+            Query.limit(10)
+          ]);
+          setTransactions(salesResponse.documents);
+        } catch (salesErr) {
+          console.warn('Could not fetch sales:', salesErr);
+          setTransactions(allTransactions);
+        }
       } else {
         // Fallback mock data if sales collection not yet defined
         setTransactions(allTransactions);
       }
 
     } catch (error) {
-      console.error('Error fetching dashboard data:', error);
+      console.error('General Fetch Error:', error);
     } finally {
       setLoading(false);
     }
@@ -152,17 +162,17 @@ export default function Dashboard() {
             />
           </div>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-6">
           <button
             onClick={clearNotifications}
-            className="relative p-2 text-slate-500 hover:bg-slate-100 rounded-full transition-colors"
+            className="relative p-2 text-slate-500 hover:bg-slate-100 rounded-full transition-colors flex-shrink-0"
           >
             <span className="material-symbols-outlined">notifications</span>
             {notifications > 0 && (
               <span className="absolute top-2 right-2 size-2 bg-red-500 border-2 border-white rounded-full animate-pulse"></span>
             )}
           </button>
-          <div className="h-8 w-[1px] bg-slate-200 mx-1"></div>
+          <div className="h-8 w-[1px] bg-slate-200 flex-shrink-0"></div>
           <UserMenu />
         </div>
       </header>
@@ -240,8 +250,8 @@ export default function Dashboard() {
                 </span>
               </div>
             </div>
-            <div className="h-64 w-full">
-              <ResponsiveContainer width="100%" height="100%">
+            <div className="h-64 w-full min-h-[256px]">
+              <ResponsiveContainer width="99%" height="100%">
                 <AreaChart data={chartData}>
                   <defs>
                     <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
