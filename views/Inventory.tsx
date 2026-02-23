@@ -49,11 +49,19 @@ export default function Inventory() {
         Query.orderDesc('$createdAt'),
         Query.limit(100)
       ]);
-      const mappedProducts = response.documents.map(doc => ({
+      const mappedProducts: any[] = response.documents.map(doc => ({
         ...doc,
         id: doc.$id
       }));
       setProducts(mappedProducts);
+
+      // Derive categories from product data
+      const dynamicCategories = mappedProducts
+        .map(p => p.category)
+        .filter((cat): cat is string => !!cat && cat !== 'All');
+
+      const allUnique = Array.from(new Set([...categoryKeys, ...dynamicCategories]));
+      setCategories(allUnique);
     } catch (error) {
       console.error('Error fetching products:', error);
     } finally {

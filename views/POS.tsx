@@ -24,6 +24,7 @@ export default function POS() {
   };
 
   const [products, setProducts] = useState(mockProductsFallback);
+  const [categories, setCategories] = useState(categoryKeys);
   const [loading, setLoading] = useState(true);
   const [cart, setCart] = useState<any[]>([]);
   const [activeCategoryKey, setActiveCategoryKey] = useState('All');
@@ -39,16 +40,24 @@ export default function POS() {
       }
       try {
         const response = await databases.listDocuments(DATABASE_ID, COLLECTION_INVENTORY_ID);
-        const mapped = response.documents.map(doc => ({
+        const mapped = response.documents.map((doc: any) => ({
           id: doc.$id,
           name: doc.name,
           category: doc.category,
           stock: doc.stock,
           price: doc.price,
           image: doc.image || 'https://images.unsplash.com/photo-1595341888016-a392ef81b7de?q=80&w=1000&auto=format&fit=crop', // Default placeholder
-          lowStock: doc.stock <= 5
+          lowStock: (doc.stock || 0) <= 5
         }));
         setProducts(mapped);
+
+        // Derive dynamic categories
+        const dynamicCategories = mapped
+          .map(p => p.category)
+          .filter((cat): cat is string => !!cat && cat !== 'All');
+
+        const allUnique = Array.from(new Set(['All', ...categoryKeys, ...dynamicCategories]));
+        setCategories(allUnique.filter(c => c !== 'All')); // 'All' is handled separately in some UI parts
       } catch (error) {
         console.error('Error fetching products for POS:', error);
       } finally {
@@ -341,7 +350,7 @@ export default function POS() {
 
         <div className="flex-1 flex flex-col p-4 lg:p-6 overflow-hidden">
           <div className="flex gap-2 overflow-x-auto pb-4 custom-scrollbar whitespace-nowrap shrink-0">
-            {categoryKeys.map(catKey => (
+            {['All', ...categories].map(catKey => (
               <button
                 key={catKey}
                 onClick={() => setActiveCategoryKey(catKey)}
