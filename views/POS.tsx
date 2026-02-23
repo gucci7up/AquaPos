@@ -4,6 +4,7 @@ import { databases, functions } from '@/lib/appwrite';
 
 const DATABASE_ID = import.meta.env.VITE_APPWRITE_DATABASE_ID;
 const COLLECTION_INVENTORY_ID = import.meta.env.VITE_APPWRITE_COLLECTION_INVENTORY_ID;
+const COLLECTION_CATEGORIES_ID = import.meta.env.VITE_APPWRITE_COLLECTION_CATEGORIES_ID;
 const FUNCTION_PROCESS_SALE_ID = import.meta.env.VITE_APPWRITE_FUNCTION_PROCESS_SALE_ID;
 
 // Extended Product Data (Removed fixed mock data, using it as fallback for icon layout)
@@ -65,7 +66,21 @@ export default function POS() {
       }
     };
     fetchProducts();
+    fetchCategories();
   }, []);
+
+  const fetchCategories = async () => {
+    if (!DATABASE_ID || !COLLECTION_CATEGORIES_ID) return;
+    try {
+      const response = await databases.listDocuments(DATABASE_ID, COLLECTION_CATEGORIES_ID);
+      const catNames = response.documents.map(doc => doc.name);
+      // Merge with default keys and filter duplicates
+      const allUnique = Array.from(new Set(['All', ...categoryKeys, ...catNames]));
+      setCategories(allUnique.filter(c => c !== 'All'));
+    } catch (error) {
+      console.error('Error fetching categories for POS:', error);
+    }
+  };
 
   // Customer State
   const [customers, setCustomers] = useState<any[]>([]);

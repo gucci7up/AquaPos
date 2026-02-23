@@ -6,6 +6,7 @@ import { useNavigate } from 'react-router-dom';
 
 const DATABASE_ID = import.meta.env.VITE_APPWRITE_DATABASE_ID;
 const COLLECTION_ID = import.meta.env.VITE_APPWRITE_COLLECTION_INVENTORY_ID;
+const COLLECTION_CATEGORIES_ID = import.meta.env.VITE_APPWRITE_COLLECTION_CATEGORIES_ID;
 const BUCKET_ID = import.meta.env.VITE_APPWRITE_BUCKET_IMAGES_ID || 'products';
 
 const initialProducts: any[] = [];
@@ -16,7 +17,7 @@ export default function Inventory() {
   const { t } = useLanguage();
   const navigate = useNavigate();
   const [products, setProducts] = useState(initialProducts);
-  const [categories, setCategories] = useState(categoryKeys);
+  const [categories, setCategories] = useState<string[]>(categoryKeys);
   const [loading, setLoading] = useState(true);
 
   const [filterStatus, setFilterStatus] = useState('All'); // All, In Stock, Low Stock, Out of Stock
@@ -31,10 +32,24 @@ export default function Inventory() {
     return translation === key ? cat : translation;
   };
 
-  // Fetch products on mount
+  // Fetch products and categories on mount
   useEffect(() => {
     fetchProducts();
+    fetchCategories();
   }, []);
+
+  const fetchCategories = async () => {
+    if (!DATABASE_ID || !COLLECTION_CATEGORIES_ID) return;
+    try {
+      const response = await databases.listDocuments(DATABASE_ID, COLLECTION_CATEGORIES_ID);
+      const catNames = response.documents.map(doc => doc.name);
+      // Merge with default keys and filter duplicates
+      const allUnique = Array.from(new Set([...categoryKeys, ...catNames]));
+      setCategories(allUnique);
+    } catch (error) {
+      console.error('Error fetching categories:', error);
+    }
+  };
 
   const fetchProducts = async () => {
     if (!DATABASE_ID || !COLLECTION_ID) {
@@ -229,17 +244,41 @@ export default function Inventory() {
     }
   };
 
-  const handleAddCategory = () => {
-    if (newCategoryName.trim() && !categories.includes(newCategoryName.trim())) {
-      setCategories([...categories, newCategoryName.trim()]);
+  const handleAddCategory = async () => {
+    const name = newCategoryName.trim();
+    if (name && !categories.includes(name)) {
+      setCategories([...categories, name]);
       setNewCategoryName('');
+
+      // Save to Appwrite for persistence
+      if (DATABASE_ID && COLLECTION_CATEGORIES_ID) {
+        try {
+          await databases.createDocument(DATABASE_ID, COLLECTION_CATEGORIES_ID, ID.unique(), { name });
+        } catch (error) {
+          console.error('Error saving category to Appwrite:', error);
+        }
+      }
     }
   };
 
-  const handleDeleteCategory = (cat: string) => {
+  const handleDeleteCategory = async (cat: string) => {
     if (confirm(`Delete category "${cat}"? Products in this category will not be deleted but may need updating.`)) {
       setCategories(categories.filter(c => c !== cat));
       if (filterCategory === cat) setFilterCategory('All');
+
+      // Delete from Appwrite
+      if (DATABASE_ID && COLLECTION_CATEGORIES_ID) {
+        try {
+          const response = await databases.listDocuments(DATABASE_ID, COLLECTION_CATEGORIES_ID, [
+            Query.equal('name', cat)
+          ]);
+          if (response.documents.length > 0) {
+            await databases.deleteDocument(DATABASE_ID, COLLECTION_CATEGORIES_ID, response.documents[0].$id);
+          }
+        } catch (error) {
+          console.error('Error deleting category from Appwrite:', error);
+        }
+      }
     }
   };
 
