@@ -9,6 +9,10 @@ if (endpoint && project) {
     client
         .setEndpoint(endpoint)
         .setProject(project);
+} else {
+    console.warn('Appwrite configuration missing! Check your VITE_APPWRITE_ENDPOINT and VITE_APPWRITE_PROJECT_ID environment variables.');
+    console.debug('Endpoint:', endpoint);
+    console.debug('Project:', project);
 }
 
 export const account = new Account(client);
