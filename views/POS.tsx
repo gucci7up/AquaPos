@@ -1,12 +1,14 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useLanguage } from '../LanguageContext';
 import { databases, functions, ID, Query } from '@/lib/appwrite';
+import { PrintTemplates } from '../components/PrintTemplates';
 
 const DATABASE_ID = import.meta.env.VITE_APPWRITE_DATABASE_ID;
 const COLLECTION_INVENTORY_ID = import.meta.env.VITE_APPWRITE_COLLECTION_INVENTORY_ID;
 const COLLECTION_CATEGORIES_ID = import.meta.env.VITE_APPWRITE_COLLECTION_CATEGORIES_ID;
 const COLLECTION_SETTINGS_ID = import.meta.env.VITE_APPWRITE_COLLECTION_SETTINGS_ID;
 const COLLECTION_SALES_ID = import.meta.env.VITE_APPWRITE_COLLECTION_SALES_ID;
+const COLLECTION_QUOTES_ID = import.meta.env.VITE_APPWRITE_COLLECTION_QUOTES_ID;
 const FUNCTION_PROCESS_SALE_ID = import.meta.env.VITE_APPWRITE_FUNCTION_PROCESS_SALE_ID;
 
 // Extended Product Data (Removed fixed mock data, using it as fallback for icon layout)
@@ -37,6 +39,11 @@ export default function POS() {
   // Settings state
   const [taxRate, setTaxRate] = useState(18); // Default to 18% (common in DR)
   const [currencySymbol, setCurrencySymbol] = useState('$');
+
+  // Printing state
+  const [processedSaleData, setProcessedSaleData] = useState<any>(null);
+  const [printType, setPrintType] = useState<'ticket' | 'invoice' | 'quote' | null>(null);
+  const [businessSettings, setBusinessSettings] = useState<any>(null);
 
   // Fetch products from Appwrite
   useEffect(() => {
@@ -80,6 +87,7 @@ export default function POS() {
         const settings = response.documents[0];
         console.log('POS Settings Loaded:', settings);
         setTaxRate(settings.taxRate ?? 18);
+        setBusinessSettings(settings);
         // Basic currency symbol logic
         if (settings.currency?.includes('USD')) setCurrencySymbol('$');
         else if (settings.currency?.includes('DOP')) setCurrencySymbol('RD$');
@@ -89,6 +97,37 @@ export default function POS() {
       }
     } catch (error) {
       console.error('Error fetching business settings for POS:', error);
+    }
+  };
+
+  const generateQuote = async () => {
+    if (cart.length === 0) return;
+    if (!DATABASE_ID || !COLLECTION_QUOTES_ID) {
+      alert('Error: Colección de cotizaciones no configurada.');
+      return;
+    }
+
+    setPaymentStep('process');
+    try {
+      const quoteData = {
+        customerId: activeCustomer?.$id || activeCustomer?.id || null,
+        items: JSON.stringify(cart.map(item => ({ id: item.id, name: item.name, quantity: item.quantity, price: item.price }))),
+        total: total,
+        status: 'Draft',
+        date: new Date().toISOString(),
+        expiry: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // 30 days
+      };
+
+      console.log('POS Creating quote document:', quoteData);
+      const doc = await databases.createDocument(DATABASE_ID, COLLECTION_QUOTES_ID, ID.unique(), quoteData);
+
+      setProcessedSaleData({ ...quoteData, id: doc.$id });
+      setPrintType('quote');
+      setPaymentStep('success'); // Use success step to show print options
+    } catch (error: any) {
+      console.error('Error generating quote:', error);
+      alert('Error al generar cotización: ' + (error.message || 'Error desconocido'));
+      setPaymentStep('select');
     }
   };
 
@@ -193,6 +232,41 @@ export default function POS() {
     setCustomerSearch('');
   };
 
+  const handlePrint = (type: 'ticket' | 'invoice' | 'quote') => {
+    setPrintType(type);
+    // Give state a moment to update and render the print container
+    setTimeout(() => {
+      const printContents = document.getElementById('print-container')?.innerHTML;
+      if (!printContents) return;
+
+      const printWindow = window.open('', '_blank', 'width=800,height=600');
+      if (printWindow) {
+        printWindow.document.write(`
+          <html>
+            <head>
+              <title>AquaPos Print</title>
+              <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" />
+              <style>
+                @page { margin: 0; }
+                body { margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; }
+              </style>
+            </head>
+            <body>
+              ${printContents}
+              <script>
+                window.onload = () => {
+                  window.print();
+                  window.onafterprint = () => window.close();
+                };
+              </script>
+            </body>
+          </html>
+        `);
+        printWindow.document.close();
+      }
+    }, 100);
+  };
+
   const filteredCustomers = customers.filter(c =>
     (c.name || '').toLowerCase().includes(customerSearch.toLowerCase()) ||
     (c.email || '').toLowerCase().includes(customerSearch.toLowerCase())
@@ -213,7 +287,6 @@ export default function POS() {
       // 1. Create Sale Document Client-Side
       const saleData = {
         customerId: activeCustomer?.$id || activeCustomer?.id || null,
-        customerName: activeCustomer?.name || 'Guest',
         items: JSON.stringify(cart.map(item => ({ id: item.id, name: item.name, quantity: item.quantity, price: item.price }))),
         total: total,
         paymentMethod: method,
@@ -221,7 +294,11 @@ export default function POS() {
       };
 
       console.log('POS Creating sale document:', saleData);
-      await databases.createDocument(DATABASE_ID, COLLECTION_SALES_ID, ID.unique(), saleData);
+      const doc = await databases.createDocument(DATABASE_ID, COLLECTION_SALES_ID, ID.unique(), saleData);
+
+      // Store for printing
+      setProcessedSaleData({ ...saleData, id: doc.$id });
+      setPrintType('ticket');
 
       // 2. Update Inventory Stock (Sequential for safety)
       console.log('POS Updating inventory stock...');
@@ -243,6 +320,8 @@ export default function POS() {
       }
 
       setPaymentStep('success');
+      // Automatically trigger printing after success
+      handlePrint('ticket');
     } catch (error: any) {
       console.error('Error processing sale client-side:', error);
       alert('Error al procesar la venta: ' + (error.message || 'Error desconocido'));
@@ -359,14 +438,25 @@ export default function POS() {
             <span className="text-3xl font-black text-primary">{currencySymbol}{total.toFixed(2)}</span>
           </div>
         </div>
-        <button
-          onClick={openPaymentModal}
-          disabled={cart.length === 0}
-          className="w-full py-5 bg-primary text-white text-xl font-black rounded-2xl shadow-xl shadow-primary/30 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-3 disabled:opacity-50 disabled:pointer-events-none"
-        >
-          <span className="material-symbols-outlined text-3xl">shopping_cart_checkout</span>
-          {t('pos.checkout')}
-        </button>
+
+        <div className="flex gap-2">
+          <button
+            onClick={generateQuote}
+            disabled={cart.length === 0}
+            className="flex-1 py-4 bg-slate-100 text-slate-600 text-sm font-bold rounded-2xl hover:bg-slate-200 transition-all flex items-center justify-center gap-2"
+          >
+            <span className="material-symbols-outlined">request_quote</span>
+            {t('pos.quote')}
+          </button>
+          <button
+            onClick={openPaymentModal}
+            disabled={cart.length === 0}
+            className="flex-[2] py-4 bg-primary text-white text-lg font-black rounded-2xl shadow-xl shadow-primary/30 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-3 disabled:opacity-50 disabled:pointer-events-none"
+          >
+            <span className="material-symbols-outlined text-2xl">shopping_cart_checkout</span>
+            {t('pos.checkout')}
+          </button>
+        </div>
       </div>
     </>
   );
@@ -703,7 +793,24 @@ export default function POS() {
                     <span className="material-symbols-outlined text-6xl">check</span>
                   </div>
                   <h4 className="text-2xl font-black text-slate-900 mb-2">{t('pos.success')}</h4>
-                  <p className="text-slate-500 max-w-xs mx-auto mb-8">{t('pos.receiptSent')}</p>
+                  <p className="text-slate-500 max-w-xs mx-auto mb-6">{t('pos.receiptSent')}</p>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full mb-8">
+                    <button
+                      onClick={() => handlePrint('ticket')}
+                      className="flex items-center justify-center gap-2 p-4 border-2 border-slate-200 rounded-2xl hover:border-primary hover:text-primary transition-all font-bold text-sm"
+                    >
+                      <span className="material-symbols-outlined">receipt</span>
+                      Ticket (80mm)
+                    </button>
+                    <button
+                      onClick={() => handlePrint(printType === 'quote' ? 'quote' : 'invoice')}
+                      className="flex items-center justify-center gap-2 p-4 border-2 border-slate-200 rounded-2xl hover:border-primary hover:text-primary transition-all font-bold text-sm"
+                    >
+                      <span className="material-symbols-outlined">picture_as_pdf</span>
+                      A4 ({printType === 'quote' ? 'Cotización' : 'Factura'})
+                    </button>
+                  </div>
 
                   {changeAmount > 0 && (
                     <div className="bg-slate-50 rounded-xl p-4 mb-8 w-full">

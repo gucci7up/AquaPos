@@ -2,11 +2,13 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { useLanguage } from '../LanguageContext';
 import UserMenu from '../UserMenu';
 import { databases, functions, ID, Query } from '@/lib/appwrite';
+import { PrintTemplates } from '../components/PrintTemplates';
 
 const DATABASE_ID = import.meta.env.VITE_APPWRITE_DATABASE_ID;
 const COLLECTION_INVENTORY_ID = import.meta.env.VITE_APPWRITE_COLLECTION_INVENTORY_ID;
 const COLLECTION_SUPPLIERS_ID = import.meta.env.VITE_APPWRITE_COLLECTION_SUPPLIERS_ID;
 const COLLECTION_ORDERS_ID = import.meta.env.VITE_APPWRITE_COLLECTION_ORDERS_ID;
+const COLLECTION_SETTINGS_ID = import.meta.env.VITE_APPWRITE_COLLECTION_SETTINGS_ID;
 const FUNCTION_RECEIVE_STOCK_ID = import.meta.env.VITE_APPWRITE_FUNCTION_RECEIVE_STOCK_ID;
 
 // Fallback mock items removed for Appwrite integration
@@ -24,10 +26,25 @@ export default function Suppliers() {
     const [orders, setOrders] = useState<any[]>([]);
     const [products, setProducts] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
+    const [businessSettings, setBusinessSettings] = useState<any>(null);
+
+    // Printing state
+    const [activeOrderForPrint, setActiveOrderForPrint] = useState<any>(null);
 
     useEffect(() => {
         fetchInitialData();
+        fetchBusinessSettings();
     }, []);
+
+    const fetchBusinessSettings = async () => {
+        if (!DATABASE_ID || !COLLECTION_SETTINGS_ID) return;
+        try {
+            const response = await databases.listDocuments(DATABASE_ID, COLLECTION_SETTINGS_ID, [Query.limit(1)]);
+            if (response.documents.length > 0) setBusinessSettings(response.documents[0]);
+        } catch (error) {
+            console.error('Error fetching settings for Suppliers:', error);
+        }
+    };
 
     const fetchInitialData = async () => {
         if (!DATABASE_ID) return;
@@ -231,6 +248,32 @@ export default function Suppliers() {
         }
     };
 
+    const handlePrintOrder = (order: any) => {
+        setActiveOrderForPrint(order);
+        setTimeout(() => {
+            const printContents = document.getElementById('print-container')?.innerHTML;
+            if (!printContents) return;
+
+            const printWindow = window.open('', '_blank', 'width=900,height=700');
+            if (printWindow) {
+                printWindow.document.write(`
+                  <html>
+                    <head>
+                      <title>Purchase Order - ${order.id}</title>
+                      <style>@page { size: A4; margin: 0; } body { margin: 0; }</style>
+                    </head>
+                    <body>${printContents}
+                      <script>
+                        window.onload = () => { window.print(); window.onafterprint = () => window.close(); };
+                      </script>
+                    </body>
+                  </html>
+                `);
+                printWindow.document.close();
+            }
+        }, 100);
+    };
+
     // --- ORDER ITEM LOGIC ---
     const addOrderItem = () => {
         setOrderForm({
@@ -374,6 +417,9 @@ export default function Suppliers() {
                                                 <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                                     <button onClick={() => setViewOrder(order)} className="p-1.5 hover:bg-slate-100 rounded text-slate-500" title="View Details">
                                                         <span className="material-symbols-outlined text-lg">visibility</span>
+                                                    </button>
+                                                    <button onClick={() => handlePrintOrder(order)} className="p-1.5 hover:bg-slate-100 rounded text-primary" title="Print PO">
+                                                        <span className="material-symbols-outlined text-lg">picture_as_pdf</span>
                                                     </button>
                                                     {order.status !== 'Received' && (
                                                         <>
@@ -665,6 +711,16 @@ export default function Suppliers() {
                 </div>
             )}
 
+            {/* Hidden Print Container */}
+            <div id="print-container" className="hidden">
+                {activeOrderForPrint && (
+                    <PrintTemplates
+                        type="order"
+                        data={activeOrderForPrint}
+                        businessSettings={businessSettings}
+                    />
+                )}
+            </div>
         </div>
     );
 }
