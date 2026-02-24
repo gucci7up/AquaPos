@@ -1,4 +1,4 @@
-import React, { createContext, useState, useContext, ReactNode } from 'react';
+import React, { createContext, useState, useContext, useEffect, ReactNode } from 'react';
 
 type Language = 'en' | 'es';
 
@@ -281,37 +281,57 @@ const translations = {
     finance: {
       title: "Finance & Accounting",
       subtitle: "Comprehensive financial tracking, P&L, and margin analysis.",
+      period: { month: "This Month", year: "This Year" },
       kpi: {
         revenue: "Total Revenue",
         cogs: "Cost of Goods Sold",
         expenses: "Operating Expenses",
         netProfit: "Net Profit",
-        inventoryValue: "Total Inventory Value"
+        netProfitSub: "Revenue - COGS",
+        grossProfit: "Gross Profit",
+        margin: "Margin",
+        ofRevenue: "of Revenue",
+        inventoryValue: "Inventory Value (Cost)",
+        retail: "Retail",
+        pendingCredit: "Pending Customer Credit",
+        customersWithDebt: "customers in debt",
+        abonos: "Payments Received",
+        payments: "payments recorded",
+        sales: "sales",
+        inventoryPotential: "Inventory Potential Gain",
+        inventoryPotentialSub: "Retail vs Cost difference"
       },
       charts: {
         profitability: "Profitability Analysis",
         revenueVsCost: "Revenue vs Cost",
-        expensesBreakdown: "Expenses Breakdown"
+        revenueVsCostSub: "Gross profit breakdown",
+        expensesBreakdown: "Expenses Breakdown",
+        abonos: "Monthly Payments Received",
+        abonosSub: "Customer payments toward their credit balance"
       },
       table: {
-        title: "Product Margin Analysis (Cost vs Price)",
+        title: "Product Margin Analysis",
+        subtitle: "Unit profitability of current inventory",
         product: "Product",
+        category: "Category",
         unitCost: "Unit Cost",
         unitPrice: "Unit Price",
         margin: "Margin ($)",
         marginPercent: "Margin (%)",
-        roi: "ROI"
+        roi: "ROI",
+        products: "products",
+        noProducts: "No products in inventory."
       },
       pnl: {
         title: "Profit & Loss Statement",
         grossProfit: "Gross Profit",
         operatingIncome: "Operating Income",
-        netIncome: "Net Income"
+        netIncome: "NET INCOME"
       },
       inventoryValuation: {
         title: "Inventory Valuation",
-        atCost: "Valuation at Cost",
-        atRetail: "Valuation at Retail",
+        atCost: "At Cost",
+        atRetail: "At Retail Price",
         potentialProfit: "Potential Profit"
       }
     },
@@ -787,37 +807,57 @@ const translations = {
     finance: {
       title: "Finanzas y Contabilidad",
       subtitle: "Rastreo financiero completo, P&G y análisis de márgenes.",
+      period: { month: "Este Mes", year: "Este Año" },
       kpi: {
         revenue: "Ingresos Totales",
         cogs: "Costo de Ventas (COGS)",
         expenses: "Gastos Operativos",
         netProfit: "Ganancia Neta",
-        inventoryValue: "Valor Total Inventario"
+        netProfitSub: "Ingresos - COGS",
+        grossProfit: "Ganancia Bruta",
+        margin: "Margen",
+        ofRevenue: "del ingreso",
+        inventoryValue: "Valor de Inventario (Costo)",
+        retail: "Retail",
+        pendingCredit: "Crédito Pendiente (Total)",
+        customersWithDebt: "clientes con deuda",
+        abonos: "Abonos Recibidos",
+        payments: "pagos registrados",
+        sales: "ventas",
+        inventoryPotential: "Ganancia Potencial Inventario",
+        inventoryPotentialSub: "Diferencia retail vs costo"
       },
       charts: {
         profitability: "Análisis de Rentabilidad",
         revenueVsCost: "Ingresos vs Costos",
-        expensesBreakdown: "Desglose de Gastos"
+        revenueVsCostSub: "Desglose de ganancia bruta",
+        expensesBreakdown: "Desglose de Gastos",
+        abonos: "Abonos Recibidos por Mes",
+        abonosSub: "Pagos de clientes hacia su crédito"
       },
       table: {
-        title: "Análisis de Margen por Producto (Costo vs Precio)",
+        title: "Margen por Producto",
+        subtitle: "Rentabilidad unitaria del inventario actual",
         product: "Producto",
+        category: "Categoría",
         unitCost: "Costo Unit.",
         unitPrice: "Precio Unit.",
         margin: "Margen ($)",
         marginPercent: "Margen (%)",
-        roi: "ROI"
+        roi: "ROI",
+        products: "productos",
+        noProducts: "No hay productos en el inventario."
       },
       pnl: {
-        title: "Estado de Resultados (P&G)",
-        grossProfit: "Utilidad Bruta",
+        title: "Estado de Resultados",
+        grossProfit: "Ganancia Bruta",
         operatingIncome: "Utilidad Operativa",
-        netIncome: "Utilidad Neta"
+        netIncome: "GANANCIA NETA"
       },
       inventoryValuation: {
         title: "Valoración de Inventario",
-        atCost: "Valor al Costo",
-        atRetail: "Valor a Precio Venta",
+        atCost: "Al Costo",
+        atRetail: "Al Precio Retail",
         potentialProfit: "Ganancia Potencial"
       }
     },
@@ -1020,7 +1060,31 @@ const translations = {
 };
 
 export const LanguageProvider = ({ children }: { children?: ReactNode }) => {
-  const [language, setLanguage] = useState<Language>('es');
+  const [language, setLanguage] = useState<Language>(() => {
+    return (localStorage.getItem('aquapos-lang') as Language) || 'es';
+  });
+
+  const [isDark, setIsDark] = useState<boolean>(() => {
+    return localStorage.getItem('aquapos-dark') === 'true';
+  });
+
+  // Apply dark class to <html> whenever isDark changes
+  useEffect(() => {
+    const root = document.documentElement;
+    if (isDark) {
+      root.classList.add('dark');
+    } else {
+      root.classList.remove('dark');
+    }
+    localStorage.setItem('aquapos-dark', String(isDark));
+  }, [isDark]);
+
+  // Persist language
+  useEffect(() => {
+    localStorage.setItem('aquapos-lang', language);
+  }, [language]);
+
+  const toggleDark = () => setIsDark(prev => !prev);
 
   const t = (key: string) => {
     const keys = key.split('.');
@@ -1032,7 +1096,7 @@ export const LanguageProvider = ({ children }: { children?: ReactNode }) => {
   };
 
   return (
-    <LanguageContext.Provider value={{ language, setLanguage, t }}>
+    <LanguageContext.Provider value={{ language, setLanguage, t, isDark, toggleDark }}>
       {children}
     </LanguageContext.Provider>
   );

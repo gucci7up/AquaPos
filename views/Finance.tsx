@@ -13,15 +13,20 @@ const COLLECTION_INVENTORY_ID = import.meta.env.VITE_APPWRITE_COLLECTION_INVENTO
 const COLLECTION_PAYMENTS_ID = import.meta.env.VITE_APPWRITE_COLLECTION_PAYMENTS_ID || 'payments';
 const COLLECTION_CUSTOMERS_ID = import.meta.env.VITE_APPWRITE_COLLECTION_CUSTOMERS_ID || 'customers';
 
+// Month labels per language
+const MONTHS_ES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+const MONTHS_EN = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
 // ─── helpers ────────────────────────────────────────────────────────────────
 const fmt = (n: number) =>
     n.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-const MONTH_LABELS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
 
 // ─── Component ───────────────────────────────────────────────────────────────
 export default function Finance() {
-    const { t } = useLanguage();
+    const { t, language } = useLanguage();
+
+    const MONTH_LABELS = language === 'en' ? MONTHS_EN : MONTHS_ES;
 
     // ── raw data ──────────────────────────────────────────────────────────────
     const [sales, setSales] = useState<any[]>([]);
@@ -143,7 +148,7 @@ export default function Finance() {
 
             return { month: label, revenue: revMonth, cogs: cogsMonth, ganancia: revMonth - cogsMonth, abonos: abonosMonth };
         });
-    }, [sales, inventory, payments, period, currentMonth, currentYear]);
+    }, [sales, inventory, payments, period, currentMonth, currentYear, MONTH_LABELS]);
 
     // ── Product margin table ──────────────────────────────────────────────────
     const productMargins = useMemo(() => {
@@ -162,19 +167,19 @@ export default function Finance() {
         <>
             <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 z-10 shrink-0">
                 <div className="flex items-center gap-4 flex-1">
-                    <h2 className="text-lg font-bold text-slate-900">{t('finance.title') || 'Finanzas'}</h2>
+                    <h2 className="text-lg font-bold text-slate-900">{t('finance.title')}</h2>
                     <div className="flex gap-1 bg-slate-100 p-1 rounded-lg">
                         <button
                             onClick={() => setPeriod('month')}
                             className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${period === 'month' ? 'bg-white text-primary shadow' : 'text-slate-500 hover:text-slate-700'}`}
                         >
-                            Este Mes
+                            {t('finance.period.month')}
                         </button>
                         <button
                             onClick={() => setPeriod('year')}
                             className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${period === 'year' ? 'bg-white text-primary shadow' : 'text-slate-500 hover:text-slate-700'}`}
                         >
-                            Este Año
+                            {t('finance.period.year')}
                         </button>
                     </div>
                 </div>
@@ -195,55 +200,55 @@ export default function Finance() {
                         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
                             <KpiCard
                                 icon="payments" color="emerald"
-                                title="Ingresos Totales"
+                                title={t('finance.kpi.revenue')}
                                 value={`$${fmt(totalRevenue)}`}
-                                sub={`${filteredSales.length} ventas`}
+                                sub={`${filteredSales.length} ${t('finance.kpi.sales')}`}
                             />
                             <KpiCard
                                 icon="shopping_cart" color="amber"
-                                title="Costo de Ventas (COGS)"
+                                title={t('finance.kpi.cogs')}
                                 value={`$${fmt(totalCOGS)}`}
-                                sub={totalRevenue > 0 ? `${((totalCOGS / totalRevenue) * 100).toFixed(1)}% del ingreso` : '—'}
+                                sub={totalRevenue > 0 ? `${((totalCOGS / totalRevenue) * 100).toFixed(1)}% ${t('finance.kpi.ofRevenue')}` : '—'}
                             />
                             <KpiCard
                                 icon="account_balance" color="blue"
-                                title="Ganancia Bruta"
+                                title={t('finance.kpi.grossProfit')}
                                 value={`$${fmt(grossProfit)}`}
-                                sub={`Margen ${grossMargin.toFixed(1)}%`}
+                                sub={`${t('finance.kpi.margin')} ${grossMargin.toFixed(1)}%`}
                                 positive={grossProfit >= 0}
                             />
                             <KpiCard
                                 icon="trending_up" color="violet"
-                                title="Ganancia Neta"
+                                title={t('finance.kpi.netProfit')}
                                 value={`$${fmt(netProfit)}`}
-                                sub="Ingreso - COGS"
+                                sub={t('finance.kpi.netProfitSub')}
                                 positive={netProfit >= 0}
                             />
                             <KpiCard
                                 icon="inventory" color="slate"
-                                title="Valor de Inventario"
+                                title={t('finance.kpi.inventoryValue')}
                                 value={`$${fmt(inventoryVal.cost)}`}
-                                sub={`Retail: $${fmt(inventoryVal.retail)}`}
+                                sub={`${t('finance.kpi.retail')}: $${fmt(inventoryVal.retail)}`}
                             />
                             <KpiCard
                                 icon="credit_card_off" color="red"
-                                title="Crédito Pendiente (Total)"
+                                title={t('finance.kpi.pendingCredit')}
                                 value={`$${fmt(creditBalance)}`}
-                                sub={`${customers.filter(c => c.credit > 0).length} clientes con deuda`}
+                                sub={`${customers.filter(c => c.credit > 0).length} ${t('finance.kpi.customersWithDebt')}`}
                                 positive={creditBalance === 0}
                             />
                             <KpiCard
                                 icon="price_check" color="teal"
-                                title="Abonos Recibidos"
+                                title={t('finance.kpi.abonos')}
                                 value={`$${fmt(totalAbonos)}`}
-                                sub={`${filteredPayments.length} pagos registrados`}
+                                sub={`${filteredPayments.length} ${t('finance.kpi.payments')}`}
                                 positive={true}
                             />
                             <KpiCard
                                 icon="savings" color="purple"
-                                title="Ganancia Potencial Inventario"
+                                title={t('finance.kpi.inventoryPotential')}
                                 value={`$${fmt(inventoryVal.retail - inventoryVal.cost)}`}
-                                sub="Diferencia retail vs costo"
+                                sub={t('finance.kpi.inventoryPotentialSub')}
                                 positive={true}
                             />
                         </div>
@@ -255,8 +260,8 @@ export default function Finance() {
                             <div className="lg:col-span-2 bg-white rounded-xl border border-slate-200 shadow-sm p-6">
                                 <div className="flex justify-between items-center mb-6">
                                     <div>
-                                        <h3 className="text-lg font-bold text-slate-900">Ingresos vs Costos</h3>
-                                        <p className="text-sm text-slate-500">Ganancia bruta por {period === 'month' ? 'el mes' : 'mes del año'}</p>
+                                        <h3 className="text-lg font-bold text-slate-900">{t('finance.charts.revenueVsCost')}</h3>
+                                        <p className="text-sm text-slate-500">{t('finance.charts.revenueVsCostSub', { period: period === 'month' ? t('finance.period.month') : t('finance.period.year') })}</p>
                                     </div>
                                 </div>
                                 <div className="h-72 w-full">
@@ -281,9 +286,9 @@ export default function Finance() {
                                             <CartesianGrid vertical={false} stroke="#f1f5f9" />
                                             <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
                                             <Legend />
-                                            <Area type="monotone" dataKey="revenue" stroke="#10b981" fill="url(#gRev)" strokeWidth={2.5} name="Ingresos" />
-                                            <Area type="monotone" dataKey="cogs" stroke="#f59e0b" fill="url(#gCogs)" strokeWidth={2.5} name="COGS" />
-                                            <Area type="monotone" dataKey="ganancia" stroke="#6366f1" fill="url(#gGan)" strokeWidth={2.5} name="Ganancia" />
+                                            <Area type="monotone" dataKey="revenue" stroke="#10b981" fill="url(#gRev)" strokeWidth={2.5} name={t('finance.kpi.revenue')} />
+                                            <Area type="monotone" dataKey="cogs" stroke="#f59e0b" fill="url(#gCogs)" strokeWidth={2.5} name={t('finance.kpi.cogs')} />
+                                            <Area type="monotone" dataKey="ganancia" stroke="#6366f1" fill="url(#gGan)" strokeWidth={2.5} name={t('finance.pnl.grossProfit')} />
                                         </AreaChart>
                                     </ResponsiveContainer>
                                 </div>
@@ -294,16 +299,16 @@ export default function Finance() {
 
                                 {/* P&L Summary */}
                                 <div className="bg-slate-900 rounded-xl shadow-xl p-6 text-white">
-                                    <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-4">Estado de Resultados</h3>
+                                    <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-4">{t('finance.pnl.title')}</h3>
                                     <div className="space-y-3 text-sm">
-                                        <PnLRow label="Ingresos" value={totalRevenue} positive />
-                                        <PnLRow label="- COGS" value={-totalCOGS} />
+                                        <PnLRow label={t('finance.kpi.revenue')} value={totalRevenue} positive />
+                                        <PnLRow label={`- ${t('finance.kpi.cogs')}`} value={-totalCOGS} />
                                         <div className="h-px bg-slate-700 my-2" />
-                                        <PnLRow label="Ganancia Bruta" value={grossProfit} positive bold />
-                                        <PnLRow label="+ Abonos" value={totalAbonos} positive />
-                                        <PnLRow label="- Deuda Activa" value={-creditBalance} />
+                                        <PnLRow label={t('finance.pnl.grossProfit')} value={grossProfit} positive bold />
+                                        <PnLRow label={`+ ${t('finance.kpi.abonos')}`} value={totalAbonos} positive />
+                                        <PnLRow label={`- ${t('finance.kpi.pendingCredit')}`} value={-creditBalance} />
                                         <div className="h-px bg-slate-700 my-2" />
-                                        <PnLRow label="GANANCIA NETA" value={netProfit} positive={netProfit >= 0} bold large />
+                                        <PnLRow label={t('finance.pnl.netIncome')} value={netProfit} positive={netProfit >= 0} bold large />
                                     </div>
                                 </div>
 
@@ -311,20 +316,20 @@ export default function Finance() {
                                 <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
                                     <h3 className="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
                                         <span className="material-symbols-outlined text-primary text-lg">inventory</span>
-                                        Valor de Inventario
+                                        {t('finance.inventoryValuation.title')}
                                     </h3>
                                     <div className="space-y-2">
                                         <div className="flex justify-between text-sm">
-                                            <span className="text-slate-500">Al Costo</span>
+                                            <span className="text-slate-500">{t('finance.inventoryValuation.atCost')}</span>
                                             <span className="font-bold text-slate-800">${fmt(inventoryVal.cost)}</span>
                                         </div>
                                         <div className="flex justify-between text-sm">
-                                            <span className="text-slate-500">Al Precio Retail</span>
+                                            <span className="text-slate-500">{t('finance.inventoryValuation.atRetail')}</span>
                                             <span className="font-bold text-primary">${fmt(inventoryVal.retail)}</span>
                                         </div>
                                         <div className="h-px bg-slate-100 my-1" />
                                         <div className="flex justify-between text-sm font-bold">
-                                            <span className="text-slate-500">Ganancia Potencial</span>
+                                            <span className="text-slate-500">{t('finance.inventoryValuation.potentialProfit')}</span>
                                             <span className="text-emerald-600">+${fmt(inventoryVal.retail - inventoryVal.cost)}</span>
                                         </div>
                                     </div>
@@ -335,8 +340,8 @@ export default function Finance() {
                         {/* Abonos Bar Chart */}
                         {period === 'year' && (
                             <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
-                                <h3 className="text-lg font-bold text-slate-900 mb-1">Abonos Recibidos por Mes</h3>
-                                <p className="text-sm text-slate-500 mb-6">Pagos de clientes hacia su crédito</p>
+                                <h3 className="text-lg font-bold text-slate-900 mb-1">{t('finance.charts.abonos')}</h3>
+                                <p className="text-sm text-slate-500 mb-6">{t('finance.charts.abonosSub')}</p>
                                 <div className="h-56">
                                     <ResponsiveContainer width="100%" height="100%">
                                         <BarChart data={chartData}>
@@ -344,7 +349,7 @@ export default function Finance() {
                                             <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 12 }} />
                                             <CartesianGrid vertical={false} stroke="#f1f5f9" />
                                             <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
-                                            <Bar dataKey="abonos" fill="#10b981" radius={[6, 6, 0, 0]} name="Abonos $" />
+                                            <Bar dataKey="abonos" fill="#10b981" radius={[6, 6, 0, 0]} name={t('finance.kpi.abonos')} />
                                         </BarChart>
                                     </ResponsiveContainer>
                                 </div>
@@ -355,16 +360,16 @@ export default function Finance() {
                         <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
                             <div className="p-6 border-b border-slate-100 flex items-center justify-between">
                                 <div>
-                                    <h3 className="text-lg font-bold text-slate-900">Margen por Producto</h3>
-                                    <p className="text-sm text-slate-500">Rentabilidad unitaria del inventario actual</p>
+                                    <h3 className="text-lg font-bold text-slate-900">{t('finance.table.title')}</h3>
+                                    <p className="text-sm text-slate-500">{t('finance.table.subtitle')}</p>
                                 </div>
-                                <span className="text-xs font-bold text-slate-400">{inventory.length} productos</span>
+                                <span className="text-xs font-bold text-slate-400">{inventory.length} {t('finance.table.products')}</span>
                             </div>
                             <div className="overflow-x-auto">
                                 <table className="w-full text-left">
                                     <thead className="bg-slate-50">
                                         <tr>
-                                            {['Producto', 'Categoría', 'Costo', 'Precio', 'Margen $', 'Margen %', 'ROI', 'Stock'].map(h => (
+                                            {[t('finance.table.product'), t('finance.table.category'), t('inventory.table.cost'), t('inventory.table.price'), t('finance.table.margin'), t('finance.table.marginPercent'), t('finance.table.roi'), t('inventory.table.stock')].map(h => (
                                                 <th key={h} className="px-5 py-3 text-xs font-bold text-slate-400 uppercase tracking-wider text-right first:text-left">{h}</th>
                                             ))}
                                         </tr>
@@ -373,7 +378,7 @@ export default function Finance() {
                                         {productMargins.length === 0 && (
                                             <tr>
                                                 <td colSpan={8} className="px-6 py-10 text-center text-slate-400 text-sm">
-                                                    No hay productos en el inventario.
+                                                    {t('finance.table.noProducts')}
                                                 </td>
                                             </tr>
                                         )}

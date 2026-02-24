@@ -27,7 +27,7 @@ const initialPlans = [
 ];
 
 export default function Settings() {
-    const { t, language, setLanguage } = useLanguage();
+    const { t, language, setLanguage, isDark, toggleDark } = useLanguage();
     const [activeTab, setActiveTab] = useState<'general' | 'branding' | 'team' | 'billing' | 'integrations'>('general');
 
     // State: Business Profile
@@ -368,8 +368,8 @@ export default function Settings() {
                                     <PreferenceToggle
                                         icon="dark_mode"
                                         label={t('settings.darkMode')}
-                                        checked={preferences.darkMode}
-                                        onChange={() => togglePreference('darkMode')}
+                                        checked={isDark}
+                                        onChange={toggleDark}
                                     />
                                     <PreferenceToggle
                                         icon="analytics"

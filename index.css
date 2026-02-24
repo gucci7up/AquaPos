@@ -23,3 +23,126 @@
         background-position: 200% 0;
     }
 }
+
+/* ═══════════════════════════════════════════════
+   DARK MODE — applied via .dark class on <html>
+   ═══════════════════════════════════════════════ */
+
+/* Sidebar */
+.dark aside {
+    background-color: #0f172a !important;
+    border-color: #1e293b !important;
+}
+
+.dark aside a,
+.dark aside div[class*="SidebarLink"],
+.dark aside div {
+    color: #94a3b8;
+}
+
+.dark aside div:hover {
+    background-color: #1e293b !important;
+}
+
+.dark aside p {
+    color: #475569;
+}
+
+.dark aside h1 {
+    color: #f1f5f9 !important;
+}
+
+/* Headers */
+.dark header {
+    background-color: #0f172a !important;
+    border-color: #1e293b !important;
+}
+
+.dark header h2 {
+    color: #f1f5f9 !important;
+}
+
+/* Main content backgrounds */
+.dark main,
+.dark .bg-slate-50,
+.dark [class*="bg-background"] {
+    background-color: #0f172a !important;
+}
+
+/* Cards and panels */
+.dark .bg-white {
+    background-color: #1e293b !important;
+    border-color: #334155 !important;
+}
+
+/* Text */
+.dark .text-slate-900 {
+    color: #f1f5f9 !important;
+}
+
+.dark .text-slate-800 {
+    color: #e2e8f0 !important;
+}
+
+.dark .text-slate-700 {
+    color: #cbd5e1 !important;
+}
+
+.dark .text-slate-600 {
+    color: #94a3b8 !important;
+}
+
+.dark .text-slate-500 {
+    color: #64748b !important;
+}
+
+.dark .text-slate-400 {
+    color: #475569 !important;
+}
+
+/* Table rows */
+.dark tbody tr:hover {
+    background-color: #1e293b !important;
+}
+
+.dark .divide-y>* {
+    border-color: #334155 !important;
+}
+
+.dark .border-slate-100 {
+    border-color: #334155 !important;
+}
+
+.dark .border-slate-200 {
+    border-color: #334155 !important;
+}
+
+/* Inputs & selects */
+.dark input,
+.dark select,
+.dark textarea {
+    background-color: #0f172a !important;
+    border-color: #334155 !important;
+    color: #e2e8f0 !important;
+}
+
+.dark input::placeholder {
+    color: #475569 !important;
+}
+
+/* Backgrounds for slight grey sections */
+.dark .bg-slate-50,
+.dark thead.bg-slate-50,
+.dark .bg-slate-100 {
+    background-color: #162032 !important;
+}
+
+/* Navigation links active state */
+.dark div[class*="bg-primary\/10"] {
+    background-color: rgba(19, 218, 236, 0.12) !important;
+}
+
+/* Mobile nav */
+.dark .bg-white\/90 {
+    background-color: rgba(15, 23, 42, 0.95) !important;
+}
