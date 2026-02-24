@@ -77,11 +77,14 @@ export default function POS() {
       ]);
       if (response.documents.length > 0) {
         const settings = response.documents[0];
-        setTaxRate(settings.taxRate || 0);
+        console.log('POS Settings Loaded:', settings);
+        setTaxRate(settings.taxRate ?? 18);
         // Basic currency symbol logic
         if (settings.currency?.includes('USD')) setCurrencySymbol('$');
         else if (settings.currency?.includes('DOP')) setCurrencySymbol('RD$');
         else setCurrencySymbol('$');
+      } else {
+        console.log('POS No settings found in collection');
       }
     } catch (error) {
       console.error('Error fetching business settings for POS:', error);
@@ -291,7 +294,7 @@ export default function POS() {
             </div>
             <div className="flex-1 min-w-0">
               <h4 className="text-sm font-bold text-slate-900 truncate">{item.name}</h4>
-              <p className="text-xs text-slate-500">${item.price.toFixed(2)} / unit</p>
+              <p className="text-xs text-slate-500">{currencySymbol}{item.price.toFixed(2)} / unit</p>
             </div>
             <div className="flex items-center gap-3">
               <div className="flex items-center bg-white rounded-lg border border-slate-200 p-1">
@@ -303,7 +306,7 @@ export default function POS() {
                   <span className="material-symbols-outlined text-sm">add</span>
                 </button>
               </div>
-              <div className="w-16 text-right font-black text-slate-900">${(item.price * item.quantity).toFixed(2)}</div>
+              <div className="w-16 text-right font-black text-slate-900">{currencySymbol}{(item.price * item.quantity).toFixed(2)}</div>
             </div>
           </div>
         ))}
@@ -320,21 +323,21 @@ export default function POS() {
         <div className="space-y-2 mb-6">
           <div className="flex justify-between text-sm">
             <span className="text-slate-500 font-medium">{t('pos.subtotal')}</span>
-            <span className="text-slate-900 font-bold">${subtotal.toFixed(2)}</span>
+            <span className="text-slate-900 font-bold">{currencySymbol}{subtotal.toFixed(2)}</span>
           </div>
           <div className="flex justify-between text-sm">
-            <span className="text-slate-500 font-medium">{t('pos.tax')}</span>
-            <span className="text-slate-900 font-bold">${tax.toFixed(2)}</span>
+            <span className="text-slate-500 font-medium">{t('pos.tax')} ({taxRate}%)</span>
+            <span className="text-slate-900 font-bold">{currencySymbol}{tax.toFixed(2)}</span>
           </div>
           {activeCustomer && (
             <div className="flex justify-between text-sm">
               <span className="text-primary font-bold">{t('pos.discount')} ({activeCustomer.type})</span>
-              <span className="text-primary font-bold">-$0.00</span>
+              <span className="text-primary font-bold">-{currencySymbol}0.00</span>
             </div>
           )}
           <div className="pt-4 mt-4 border-t border-slate-200 flex justify-between items-end">
             <span className="text-lg font-black text-slate-900">{t('pos.total')}</span>
-            <span className="text-3xl font-black text-primary">${total.toFixed(2)}</span>
+            <span className="text-3xl font-black text-primary">{currencySymbol}{total.toFixed(2)}</span>
           </div>
         </div>
         <button
@@ -426,7 +429,7 @@ export default function POS() {
                     </div>
                   </div>
                   <h3 className="text-xs font-bold text-slate-900 line-clamp-1">{product.name}</h3>
-                  <div className="mt-1 text-sm font-black text-slate-900">${product.price.toFixed(2)}</div>
+                  <div className="mt-1 text-sm font-black text-slate-900">{currencySymbol}{product.price.toFixed(2)}</div>
                 </button>
               ))}
               {!loading && filteredProducts.length === 0 && (
@@ -460,7 +463,7 @@ export default function POS() {
               <div className="bg-white/20 px-3 py-1 rounded-lg text-sm font-bold">{itemCount} items</div>
               <span className="text-sm font-medium opacity-80">View Cart</span>
             </div>
-            <span className="text-xl font-bold">${total.toFixed(2)}</span>
+            <span className="text-xl font-bold">{currencySymbol}{total.toFixed(2)}</span>
           </button>
         </div>
       )}
@@ -521,7 +524,7 @@ export default function POS() {
             <div className="bg-slate-900 p-8 text-center relative overflow-hidden">
               <div className="absolute top-0 right-0 w-32 h-32 bg-primary/10 rounded-full blur-3xl -mr-10 -mt-10"></div>
               <h3 className="text-slate-400 text-sm font-bold uppercase tracking-widest mb-1">{t('pos.total')}</h3>
-              <h2 className="text-5xl font-black text-white tracking-tight">${total.toFixed(2)}</h2>
+              <h2 className="text-5xl font-black text-white tracking-tight">{currencySymbol}{total.toFixed(2)}</h2>
               <button onClick={closePaymentModal} className="absolute top-6 right-6 text-slate-500 hover:text-white transition-colors">
                 <span className="material-symbols-outlined">close</span>
               </button>
@@ -569,7 +572,7 @@ export default function POS() {
                   <div className="space-y-2">
                     <label className="text-xs font-bold text-slate-500 uppercase">{t('pos.amountTendered')}</label>
                     <div className="relative">
-                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xl">$</span>
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xl">{currencySymbol}</span>
                       <input
                         type="number"
                         autoFocus
@@ -584,18 +587,18 @@ export default function POS() {
                   <div className="grid grid-cols-4 gap-2">
                     {[10, 20, 50, 100].map(val => (
                       <button key={val} onClick={() => addCash(val)} className="py-2 bg-white border border-slate-200 rounded-lg text-sm font-bold hover:bg-slate-50 text-slate-700">
-                        +${val}
+                        +{currencySymbol}{val}
                       </button>
                     ))}
                     <button onClick={setExactCash} className="col-span-4 py-3 bg-emerald-100 text-emerald-700 rounded-lg text-sm font-bold hover:bg-emerald-200">
-                      Exact Amount (${total.toFixed(2)})
+                      Exact Amount ({currencySymbol}{total.toFixed(2)})
                     </button>
                   </div>
 
                   {parseFloat(amountTendered) >= total && (
                     <div className="bg-slate-900 text-white p-4 rounded-xl flex justify-between items-center animate-in zoom-in-95">
                       <span className="font-bold text-slate-400">Change Due:</span>
-                      <span className="text-2xl font-black">${(parseFloat(amountTendered) - total).toFixed(2)}</span>
+                      <span className="text-2xl font-black">{currencySymbol}{(parseFloat(amountTendered) - total).toFixed(2)}</span>
                     </div>
                   )}
 
