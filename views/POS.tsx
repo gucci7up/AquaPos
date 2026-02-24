@@ -16,8 +16,6 @@ const mockProductsFallback: any[] = [];
 
 const COLLECTION_CUSTOMERS_ID = import.meta.env.VITE_APPWRITE_COLLECTION_CUSTOMERS_ID;
 
-const categoryKeys = ['All', 'Apparel', 'Grocery', 'Electronics', 'Home', 'Fitness', 'Accessories', 'Perfumes', 'Beauty', 'General'];
-
 export default function POS() {
   const { t } = useLanguage();
 
@@ -29,7 +27,7 @@ export default function POS() {
   };
 
   const [products, setProducts] = useState(mockProductsFallback);
-  const [categories, setCategories] = useState(categoryKeys);
+  const [categories, setCategories] = useState(['All', 'General']);
   const [loading, setLoading] = useState(true);
   const [cart, setCart] = useState<any[]>([]);
   const [activeCategoryKey, setActiveCategoryKey] = useState('All');
@@ -141,13 +139,14 @@ export default function POS() {
       const response = await databases.listDocuments(DATABASE_ID, COLLECTION_CATEGORIES_ID);
       const collectionCats = response.documents.map(doc => doc.name);
 
-      // Merge with hardcoded default keys and filter duplicates
-      const allUnique = Array.from(new Set(['All', ...categoryKeys, ...collectionCats]));
-      setCategories(allUnique.filter(c => c !== 'All'));
+      // Only use database categories, ensuring 'All' is at the start for filtering
+      const finalCats = ['All', ...collectionCats];
+      if (finalCats.length === 1) finalCats.push('General'); // If empty, show All + General
+      setCategories(finalCats);
     } catch (error: any) {
       console.error('Error fetching categories for POS:', error);
-      // Fallback to defaults if collection missing
-      setCategories(categoryKeys.filter(c => c !== 'All'));
+      // Fallback to minimal state if collection missing
+      if (categories.length === 0) setCategories(['All', 'General']);
     }
   };
 

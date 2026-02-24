@@ -11,13 +11,11 @@ const BUCKET_ID = import.meta.env.VITE_APPWRITE_BUCKET_IMAGES_ID || 'products';
 
 const initialProducts: any[] = [];
 
-const categoryKeys = ['Apparel', 'Grocery', 'Electronics', 'Home', 'Fitness', 'General'];
-
 export default function Inventory() {
   const { t } = useLanguage();
   const navigate = useNavigate();
   const [products, setProducts] = useState(initialProducts);
-  const [categories, setCategories] = useState<string[]>(categoryKeys);
+  const [categories, setCategories] = useState<string[]>(['General']);
   const [loading, setLoading] = useState(true);
 
   const [filterStatus, setFilterStatus] = useState('All'); // All, In Stock, Low Stock, Out of Stock
@@ -44,12 +42,13 @@ export default function Inventory() {
       const response = await databases.listDocuments(DATABASE_ID, COLLECTION_CATEGORIES_ID);
       const collectionCats = response.documents.map(doc => doc.name);
 
-      // Merge with hardcoded default keys and filter duplicates
-      const allUnique = Array.from(new Set([...categoryKeys, ...collectionCats]));
-      setCategories(allUnique);
+      // Only use database categories, or fallback to ['General'] if empty
+      const finalCats = collectionCats.length > 0 ? collectionCats : ['General'];
+      setCategories(finalCats);
     } catch (error: any) {
       console.error('Error fetching categories in Inventory:', error);
-      setCategories(categoryKeys);
+      // Ensure we have at least 'General' if there's an error
+      if (categories.length === 0) setCategories(['General']);
     }
   };
 
