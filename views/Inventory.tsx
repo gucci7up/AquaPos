@@ -49,7 +49,6 @@ export default function Inventory() {
       setCategories(allUnique);
     } catch (error: any) {
       console.error('Error fetching categories in Inventory:', error);
-      alert(`Error al cargar categorías: ${error.message}`);
       setCategories(categoryKeys);
     }
   };
@@ -251,11 +250,9 @@ export default function Inventory() {
           await databases.createDocument(DATABASE_ID, COLLECTION_CATEGORIES_ID, ID.unique(), { name });
         } catch (error: any) {
           console.error('Error saving category to Appwrite:', error);
-          alert(`Error al guardar categoría en Appwrite: ${error.message}`);
         }
       } else {
         console.warn('Cannot save category: DATABASE_ID or COLLECTION_CATEGORIES_ID is missing');
-        alert(`Error de configuración: No se pudo encontrar el ID de la colección de categorías en .env.local (VITE_APPWRITE_COLLECTION_CATEGORIES_ID)`);
       }
     }
   };
@@ -276,7 +273,6 @@ export default function Inventory() {
           }
         } catch (error: any) {
           console.error('Error deleting category from Appwrite:', error);
-          alert(`Error al borrar categoría de Appwrite: ${error.message}`);
         }
       }
     }
@@ -707,32 +703,6 @@ export default function Inventory() {
           </div>
         </div>
       )}
-      {/* Debug Status Panel (Temporary) */}
-      <div className="fixed bottom-6 left-6 z-[100] bg-slate-900 border-2 border-primary/30 p-4 rounded-2xl shadow-2xl space-y-2 min-w-[200px]">
-        <div className="text-[10px] font-black text-primary uppercase tracking-tighter mb-2 flex items-center gap-2">
-          <span className="material-symbols-outlined text-xs">analytics</span>
-          Appwrite Config Status
-        </div>
-        <div className="flex items-center justify-between text-xs font-bold text-slate-300">
-          <span>Database ID</span>
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] opacity-60">{DATABASE_ID ? 'OK' : 'ERR'}</span>
-            <div className={`size-2 rounded-full ${DATABASE_ID ? 'bg-emerald-500 shadow-[0_0_8px_theme(colors.emerald.500)]' : 'bg-red-500 shadow-[0_0_8px_theme(colors.red.500)]'}`}></div>
-          </div>
-        </div>
-        <div className="flex items-center justify-between text-xs font-bold text-slate-300">
-          <span>Categories ID</span>
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] opacity-60">{COLLECTION_CATEGORIES_ID ? 'OK' : 'MISSING'}</span>
-            <div className={`size-2 rounded-full ${COLLECTION_CATEGORIES_ID ? 'bg-emerald-500 shadow-[0_0_8px_theme(colors.emerald.500)]' : 'bg-red-500 shadow-[0_0_8px_theme(colors.red.500)]'}`}></div>
-          </div>
-        </div>
-        {!COLLECTION_CATEGORIES_ID && (
-          <div className="mt-2 p-2 bg-red-500/10 border border-red-500/20 rounded-lg text-[9px] text-red-400 font-bold leading-tight">
-            ⚠️ FALTA VARIABLE: VITE_APPWRITE_COLLECTION_CATEGORIES_ID en Dokploy Env Vars.
-          </div>
-        )}
-      </div>
     </div>
   );
 }
