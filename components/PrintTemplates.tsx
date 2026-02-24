@@ -22,11 +22,11 @@ export const PrintTemplates: React.FC<PrintDocumentProps> = ({ type, data, busin
     if (isThermal) {
         // 80mm Thermal Receipt Template
         return (
-            <div className="print-thermal" style={{ width: '80mm', padding: '5mm', fontFamily: 'monospace', fontSize: '12px', color: '#000' }}>
+            <div className="print-thermal" style={{ width: '68mm', padding: '3mm', fontFamily: 'monospace', fontSize: '11px', color: '#000' }}>
                 <style dangerouslySetInnerHTML={{
                     __html: `
           @media print {
-            @page { margin: 0; }
+            @page { margin: 0; size: 68mm auto; }
             body { margin: 0; }
             .no-print { display: none !important; }
           }
