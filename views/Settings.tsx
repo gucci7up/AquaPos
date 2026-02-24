@@ -409,17 +409,38 @@ export default function Settings() {
                                         />
                                         <div className="space-y-6">
                                             <div className="space-y-2">
-                                                <label className="text-sm font-bold text-slate-700 block">App Logo URL</label>
+                                                <label className="text-sm font-bold text-slate-700 block">Logo de la Marca</label>
                                                 <div className="flex items-center gap-4">
-                                                    <div className="size-16 bg-primary/10 rounded-xl flex items-center justify-center border border-primary/20 shrink-0">
-                                                        {branding.logoUrl ? <img src={branding.logoUrl} className="size-10 object-contain" alt="Logo" /> : <span className="material-symbols-outlined text-primary text-2xl">water_drop</span>}
+                                                    {/* Preview */}
+                                                    <div className="size-20 bg-slate-50 rounded-xl flex items-center justify-center border-2 border-dashed border-slate-200 shrink-0 overflow-hidden">
+                                                        {branding.logoUrl
+                                                            ? <img src={branding.logoUrl} className="w-full h-full object-contain p-1" alt="Logo" />
+                                                            : <span className="material-symbols-outlined text-slate-400 text-3xl">image</span>
+                                                        }
                                                     </div>
-                                                    <input
-                                                        value={branding.logoUrl}
-                                                        onChange={(e) => handleBrandingChange('logoUrl', e.target.value)}
-                                                        className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-primary"
-                                                        placeholder="https://example.com/logo.png"
-                                                    />
+                                                    {/* Upload controls */}
+                                                    <div className="flex flex-col gap-2 flex-1">
+                                                        <label className="cursor-pointer flex items-center gap-2 px-4 py-2 bg-primary text-white text-sm font-bold rounded-lg hover:brightness-105 transition-all w-fit">
+                                                            <span className="material-symbols-outlined text-sm">upload</span>
+                                                            Subir imagen
+                                                            <input
+                                                                type="file"
+                                                                accept="image/*"
+                                                                className="hidden"
+                                                                onChange={(e) => handleFileUpload('logoUrl', e)}
+                                                            />
+                                                        </label>
+                                                        <p className="text-xs text-slate-400">PNG, JPG, SVG · Recomendado 200×200px</p>
+                                                        {branding.logoUrl && (
+                                                            <button
+                                                                onClick={() => handleBrandingChange('logoUrl', '')}
+                                                                className="text-xs text-red-500 hover:text-red-700 font-medium flex items-center gap-1 w-fit"
+                                                            >
+                                                                <span className="material-symbols-outlined text-sm">delete</span>
+                                                                Eliminar logo
+                                                            </button>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             </div>
 
