@@ -41,8 +41,11 @@ return function ($context) {
         return $res->json(['success' => false, 'error' => 'Environment variables missing in Function settings'], 500);
     }
 
+    $context->log('Connecting to Appwrite at: ' . $variables['APPWRITE_FUNCTION_ENDPOINT']);
+
     try {
         // 1. Create Sale Document
+        $context->log('Attempting to create sale document...');
         $sale = $databases->createDocument(
             $databaseId,
             $salesCollectionId,
