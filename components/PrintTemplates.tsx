@@ -69,11 +69,11 @@ export const PrintTemplates: React.FC<PrintDocumentProps> = ({ type, data, busin
                 <div style={{ borderTop: '1px dashed #000', paddingTop: '5px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold' }}>
                         <span>SUBTOTAL:</span>
-                        <span>{formatCurrency(data.total / 1.18)}</span>
+                        <span>{formatCurrency(data.subtotal || (data.total / 1.18))}</span>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <span>ITBIS (18%):</span>
-                        <span>{formatCurrency(data.total - (data.total / 1.18))}</span>
+                        <span>{businessSettings?.taxId ? 'ITBIS' : 'IMP.'} ({data.taxRate || 18}%):</span>
+                        <span>{formatCurrency(data.tax || (data.total - (data.subtotal || data.total / 1.18)))}</span>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '16px', fontWeight: 'black', marginTop: '5px' }}>
                         <span>TOTAL:</span>
@@ -159,11 +159,11 @@ export const PrintTemplates: React.FC<PrintDocumentProps> = ({ type, data, busin
                 <div style={{ width: '250px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #f1f5f9' }}>
                         <span style={{ color: '#64748b' }}>Subtotal:</span>
-                        <span>{formatCurrency(data.total / 1.18)}</span>
+                        <span>{formatCurrency(data.subtotal || (data.total / 1.18))}</span>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #f1f5f9' }}>
-                        <span style={{ color: '#64748b' }}>ITBIS (18%):</span>
-                        <span>{formatCurrency(data.total - (data.total / 1.18))}</span>
+                        <span style={{ color: '#64748b' }}>ITBIS / TAX ({data.taxRate || 18}%):</span>
+                        <span>{formatCurrency(data.tax || (data.total - (data.subtotal || data.total / 1.18)))}</span>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 0', fontSize: '20px', fontWeight: 'bold', color: '#0ea5e9' }}>
                         <span>Total:</span>

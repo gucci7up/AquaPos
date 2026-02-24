@@ -110,6 +110,9 @@ export default function POS() {
       const quoteData = {
         customerId: activeCustomer?.$id || activeCustomer?.id || null,
         items: JSON.stringify(cart.map(item => ({ id: item.id, name: item.name, quantity: item.quantity, price: item.price }))),
+        subtotal: subtotal,
+        tax: tax,
+        taxRate: taxRate,
         total: total,
         status: 'Draft',
         date: new Date().toISOString(),
@@ -297,7 +300,11 @@ export default function POS() {
       // 1. Create Sale Document Client-Side
       const saleData = {
         customerId: activeCustomer?.$id || activeCustomer?.id || null,
+        customerName: activeCustomer?.name || 'Guest',
         items: JSON.stringify(cart.map(item => ({ id: item.id, name: item.name, quantity: item.quantity, price: item.price }))),
+        subtotal: subtotal,
+        tax: tax,
+        taxRate: taxRate,
         total: total,
         paymentMethod: method,
         date: new Date().toISOString()
