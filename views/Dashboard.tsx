@@ -272,7 +272,14 @@ export default function Dashboard() {
                       formatter={(value: any) => [`$${value}`, 'Revenue']}
                     />
                     <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 12 }} />
-                    <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 12 }} tickFormatter={(v) => `$${v}`} />
+                    <YAxis
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fill: '#94a3b8', fontSize: 12 }}
+                      tickFormatter={(v) => `$${v}`}
+                      domain={[0, (dataMax: number) => Math.max(dataMax * 1.2, 100)]}
+                      allowDataOverflow={false}
+                    />
                     <CartesianGrid vertical={false} stroke="#f1f5f9" />
                     <Area
                       type="monotone"
