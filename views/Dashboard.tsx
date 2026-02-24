@@ -255,9 +255,9 @@ export default function Dashboard() {
                 </span>
               </div>
             </div>
-            <div className="h-64 w-full min-h-[256px]">
+            <div className="h-64 w-full">
               {mounted && (
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer width="100%" height={256}>
                   <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                     <defs>
                       <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">

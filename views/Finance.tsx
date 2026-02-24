@@ -146,7 +146,13 @@ export default function Finance() {
                 .filter(p => { const d = new Date(p.date || p.$createdAt); return d.getMonth() === monthIdx && d.getFullYear() === currentYear; })
                 .reduce((s, d) => s + (d.amount || 0), 0);
 
-            return { month: label, revenue: revMonth, cogs: cogsMonth, ganancia: revMonth - cogsMonth, abonos: abonosMonth };
+            return {
+                month: label || `M${i + 1}`,
+                revenue: Number(revMonth) || 0,
+                cogs: Number(cogsMonth) || 0,
+                ganancia: Number(revMonth - cogsMonth) || 0,
+                abonos: Number(abonosMonth) || 0,
+            };
         });
     }, [sales, inventory, payments, period, currentMonth, currentYear, MONTH_LABELS]);
 
@@ -265,7 +271,7 @@ export default function Finance() {
                                     </div>
                                 </div>
                                 <div className="h-72 w-full">
-                                    <ResponsiveContainer width="100%" height="100%">
+                                    <ResponsiveContainer width="100%" height={288}>
                                         <AreaChart data={chartData} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
                                             <defs>
                                                 <linearGradient id="gRev" x1="0" y1="0" x2="0" y2="1">
@@ -342,8 +348,8 @@ export default function Finance() {
                             <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
                                 <h3 className="text-lg font-bold text-slate-900 mb-1">{t('finance.charts.abonos')}</h3>
                                 <p className="text-sm text-slate-500 mb-6">{t('finance.charts.abonosSub')}</p>
-                                <div className="h-56">
-                                    <ResponsiveContainer width="100%" height="100%">
+                                <div className="h-56 w-full">
+                                    <ResponsiveContainer width="100%" height={224}>
                                         <BarChart data={chartData}>
                                             <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 12 }} />
                                             <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 12 }} />
