@@ -218,7 +218,20 @@ export default function POS() {
         JSON.stringify(payload)
       );
 
-      const response = JSON.parse(execution.responseBody);
+      console.log('POS Sale Execution Raw Response:', execution.responseBody);
+
+      if (!execution.responseBody) {
+        throw new Error('Empry response from server. Check Appwrite Function logs.');
+      }
+
+      let response;
+      try {
+        response = JSON.parse(execution.responseBody);
+      } catch (e) {
+        console.error('POS JSON Parse Error:', e, 'Raw Body:', execution.responseBody);
+        throw new Error(`Invalid server response (JSON parse error). Body: ${execution.responseBody.substring(0, 50)}...`);
+      }
+
       if (response.success) {
         setPaymentStep('success');
       } else {
