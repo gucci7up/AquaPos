@@ -117,7 +117,7 @@ export default function Quotes() {
 
     // items must be stringified for Appwrite
     const itemsJson = JSON.stringify(formData.items);
-    const total = calculateTotal(formData.items) * 1.18; // Using 18% as standard in DR
+    const total = calculateTotal(formData.items); // Removido el impuesto por solicitud del usuario
 
     const quoteData = {
       taxId: formData.taxId,
@@ -228,8 +228,7 @@ export default function Quotes() {
   };
 
   const modalSubtotal = calculateTotal(formData.items);
-  const modalTax = modalSubtotal * 0.15;
-  const modalTotal = modalSubtotal + modalTax;
+  const modalTotal = modalSubtotal; // Sin impuestos en cotizaciones
 
   return (
     <>
@@ -309,7 +308,7 @@ export default function Quotes() {
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {filteredQuotes.map(quote => {
-                  const totalAmt = quote.total || (calculateTotal(quote.items) * 1.18);
+                  const totalAmt = quote.total || calculateTotal(quote.items);
                   return (
                     <QuoteRow
                       key={quote.id}
@@ -474,10 +473,6 @@ export default function Quotes() {
                   <div className="flex justify-between gap-8 text-sm">
                     <span className="text-slate-500">Subtotal:</span>
                     <span className="font-medium text-slate-900">${modalSubtotal.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between gap-8 text-sm">
-                    <span className="text-slate-500">Tax (15%):</span>
-                    <span className="font-medium text-slate-900">${modalTax.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between gap-8 text-xl font-bold text-slate-900 pt-2 border-t border-slate-200">
                     <span>Total:</span>

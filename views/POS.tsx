@@ -111,9 +111,9 @@ export default function POS() {
         customerId: activeCustomer?.$id || activeCustomer?.id || null,
         items: JSON.stringify(cart.map(item => ({ id: item.id, name: item.name, quantity: item.quantity, price: item.price }))),
         subtotal: subtotal,
-        tax: tax,
-        taxRate: taxRate,
-        total: total,
+        tax: 0,
+        taxRate: 0,
+        total: subtotal,
         status: 'Draft',
         date: new Date().toISOString(),
         expiry: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // 30 days
