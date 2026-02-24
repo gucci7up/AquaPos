@@ -115,8 +115,8 @@ export default function Dashboard() {
     // Low stock: items with stock < 10
     const lowStock = inventory.filter(i => safeNum(i.stock) < 10 && i.stock !== undefined);
 
-    // Open quotes
-    const openQuotes = quotes.filter(q => q.status === 'open' || q.status === 'pending' || !q.status);
+    // Open quotes — only Draft or Sent, matching real Quotes.tsx status values
+    const openQuotes = quotes.filter(q => q.status === 'Draft' || q.status === 'Sent');
 
     // Customers with credit
     const creditBalance = customers.reduce((a, c) => a + safeNum(c.creditBalance || c.credit_balance), 0);
@@ -451,10 +451,10 @@ export default function Dashboard() {
               {insights.map((ins, i) => (
                 <div key={i} className="flex items-start gap-3 bg-white/5 rounded-xl p-3">
                   <div className={`size-8 rounded-lg flex items-center justify-center shrink-0 ${ins.color === 'amber' ? 'bg-amber-500/20 text-amber-400' :
-                      ins.color === 'blue' ? 'bg-blue-500/20 text-blue-400' :
-                        ins.color === 'purple' ? 'bg-purple-500/20 text-purple-400' :
-                          ins.color === 'emerald' ? 'bg-emerald-500/20 text-emerald-400' :
-                            'bg-slate-600 text-slate-400'
+                    ins.color === 'blue' ? 'bg-blue-500/20 text-blue-400' :
+                      ins.color === 'purple' ? 'bg-purple-500/20 text-purple-400' :
+                        ins.color === 'emerald' ? 'bg-emerald-500/20 text-emerald-400' :
+                          'bg-slate-600 text-slate-400'
                     }`}>
                     <span className="material-symbols-outlined text-sm">{ins.icon}</span>
                   </div>
