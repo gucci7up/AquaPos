@@ -2,12 +2,11 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { useLanguage } from '../LanguageContext';
 import UserMenu from '../UserMenu';
 import { databases, Query } from '@/lib/appwrite';
+import { PrintTemplates } from '../components/PrintTemplates';
 
 const DATABASE_ID = import.meta.env.VITE_APPWRITE_DATABASE_ID;
-const COLLECTION_ID = import.meta.env.VITE_APPWRITE_COLLECTION_SALES_ID;
-
-// Legacy mock items removed
-const allTransactionsFallback: any[] = [];
+const COLLECTION_SALES_ID = import.meta.env.VITE_APPWRITE_COLLECTION_SALES_ID;
+const COLLECTION_SETTINGS_ID = import.meta.env.VITE_APPWRITE_COLLECTION_SETTINGS_ID;
 
 export default function Sales() {
   const { t } = useLanguage();
@@ -16,27 +15,46 @@ export default function Sales() {
   const [searchQuery, setSearchQuery] = useState('');
   const [dateRange, setDateRange] = useState<'Today' | 'Week'>('Today');
 
+  // Printing state
+  const [activeSale, setActiveSale] = useState<any>(null);
+  const [printType, setPrintType] = useState<'ticket' | 'invoice' | 'quote' | null>(null);
+  const [businessSettings, setBusinessSettings] = useState<any>(null);
+
   useEffect(() => {
     fetchSales();
+    fetchBusinessSettings();
   }, [dateRange]);
 
+  const fetchBusinessSettings = async () => {
+    if (!DATABASE_ID || !COLLECTION_SETTINGS_ID) return;
+    try {
+      const response = await databases.listDocuments(DATABASE_ID, COLLECTION_SETTINGS_ID, [
+        Query.limit(1)
+      ]);
+      if (response.documents.length > 0) {
+        setBusinessSettings(response.documents[0]);
+      }
+    } catch (error) {
+      console.error('Error fetching business settings for Sales:', error);
+    }
+  };
+
   const fetchSales = async () => {
-    if (!DATABASE_ID || !COLLECTION_ID) {
+    if (!DATABASE_ID || !COLLECTION_SALES_ID) {
       setLoading(false);
       return;
     }
     try {
       setLoading(true);
-      const queries = [Query.orderDesc('$createdAt')];
+      const queries = [Query.orderDesc('$createdAt'), Query.limit(100)];
 
-      // Simple mock of time filtering for the demo
       if (dateRange === 'Today') {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         queries.push(Query.greaterThanEqual('$createdAt', today.toISOString()));
       }
 
-      const response = await databases.listDocuments(DATABASE_ID, COLLECTION_ID, queries);
+      const response = await databases.listDocuments(DATABASE_ID, COLLECTION_SALES_ID, queries);
       setTransactions(response.documents.map(doc => ({
         ...doc,
         id: doc.$id,
@@ -55,11 +73,61 @@ export default function Sales() {
     }
   };
 
-  // Filter Logic
+  const handlePrint = (sale: any, type: 'ticket' | 'invoice') => {
+    // Parse items if they are stored as JSON string
+    let parsedSale = { ...sale };
+    if (typeof sale.items === 'string') {
+      try {
+        parsedSale.items = JSON.parse(sale.items);
+      } catch (e) {
+        console.error('Error parsing sale items:', e);
+        parsedSale.items = [];
+      }
+    }
+
+    setActiveSale(parsedSale);
+    setPrintType(type);
+
+    // Give state a moment to update and render the print container
+    setTimeout(() => {
+      const printContainer = document.getElementById('print-container');
+      const printContents = printContainer?.innerHTML;
+
+      if (!printContents || printContents.trim() === "") {
+        console.error('Sales Printing - Empty print container');
+        return;
+      }
+
+      const printWindow = window.open('', '_blank', 'width=800,height=600');
+      if (printWindow) {
+        printWindow.document.write(`
+          <html>
+            <head>
+              <title>AquaPos Print</title>
+              <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" />
+              <style>
+                @page { margin: 0; }
+                body { margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; }
+              </style>
+            </head>
+            <body>
+              ${printContents}
+              <script>
+                window.onload = () => {
+                  window.print();
+                  window.onafterprint = () => window.close();
+                };
+              </script>
+            </body>
+          </html>
+        `);
+        printWindow.document.close();
+      }
+    }, 300);
+  };
+
   const filteredData = useMemo(() => {
     let data = transactions;
-
-    // Filter by Search
     if (searchQuery) {
       const lowerQuery = searchQuery.toLowerCase();
       data = data.filter(t =>
@@ -68,17 +136,13 @@ export default function Sales() {
         (t.customerId && t.customerId.toLowerCase().includes(lowerQuery))
       );
     }
-
     return data;
   }, [searchQuery, transactions]);
 
-  // Statistics Calculations
   const totalRevenue = filteredData.reduce((sum, t) => sum + t.amount, 0);
   const transactionCount = filteredData.length;
   const averageOrderValue = transactionCount > 0 ? totalRevenue / transactionCount : 0;
-
-  // Goals Configuration
-  const salesGoal = dateRange === 'Today' ? 5000 : 25000; // Dynamic goal based on period
+  const salesGoal = dateRange === 'Today' ? 5000 : 25000;
   const goalProgress = Math.min((totalRevenue / salesGoal) * 100, 100);
 
   const handleExport = () => {
@@ -161,14 +225,8 @@ export default function Sales() {
                     {filteredData.map(tx => (
                       <SalesRow
                         key={tx.id}
-                        id={tx.id}
-                        name={tx.name}
-                        initials={tx.initials}
-                        method={tx.method}
-                        methodIcon={tx.methodIcon}
-                        amount={`$${tx.amount.toFixed(2)}`}
-                        time={tx.date}
-                        color={tx.color}
+                        transaction={tx}
+                        onPrint={(type: 'ticket' | 'invoice') => handlePrint(tx, type)}
                       />
                     ))}
                     {filteredData.length === 0 && (
@@ -251,11 +309,25 @@ export default function Sales() {
           </div>
         </div>
       </div>
+
+      {/* Hidden Print Container */}
+      <div id="print-container" className="hidden">
+        {activeSale && (
+          <PrintTemplates
+            type={printType || 'ticket'}
+            data={activeSale}
+            businessSettings={businessSettings || {}}
+          />
+        )}
+      </div>
     </>
   );
 }
 
-const SalesRow = ({ id, name, initials, method, methodIcon, amount, time, color = 'slate' }: any) => {
+const SalesRow = ({ transaction, onPrint }: any) => {
+  const { id, name, initials, method, methodIcon, amount, date, color = 'slate' } = transaction;
+  const [showOptions, setShowOptions] = useState(false);
+
   const badgeColors: any = {
     slate: 'bg-slate-100 text-slate-600',
     blue: 'bg-blue-50 text-blue-600',
@@ -263,8 +335,8 @@ const SalesRow = ({ id, name, initials, method, methodIcon, amount, time, color 
   };
 
   return (
-    <tr className="hover:bg-slate-50 transition-colors">
-      <td className="px-6 py-4 text-sm font-bold text-slate-700">{id}</td>
+    <tr className="hover:bg-slate-50 transition-colors group">
+      <td className="px-6 py-4 text-sm font-bold text-slate-700">{id.substring(0, 8)}...</td>
       <td className="px-6 py-4">
         <div className="flex items-center gap-3">
           <div className={`size-8 rounded-full flex items-center justify-center text-xs font-bold ${color === 'blue' ? 'bg-blue-100 text-blue-600' : color === 'purple' ? 'bg-purple-100 text-purple-600' : 'bg-primary/10 text-primary'}`}>{initials}</div>
@@ -276,10 +348,36 @@ const SalesRow = ({ id, name, initials, method, methodIcon, amount, time, color 
           <span className="material-symbols-outlined text-sm">{methodIcon}</span> {method}
         </span>
       </td>
-      <td className="px-6 py-4 text-sm font-bold text-slate-900">{amount}</td>
-      <td className="px-6 py-4 text-sm text-slate-500">{time}</td>
-      <td className="px-6 py-4 text-right">
-        <button className="material-symbols-outlined text-slate-400 hover:text-slate-600">visibility</button>
+      <td className="px-6 py-4 text-sm font-bold text-slate-900">${amount.toFixed(2)}</td>
+      <td className="px-6 py-4 text-sm text-slate-500">{date}</td>
+      <td className="px-6 py-4 text-right relative">
+        <div className="flex items-center justify-end gap-2">
+          <button
+            onClick={() => setShowOptions(!showOptions)}
+            className="material-symbols-outlined text-slate-400 hover:text-primary transition-colors p-1 rounded-full hover:bg-slate-100"
+          >
+            visibility
+          </button>
+
+          {showOptions && (
+            <div className="absolute right-12 top-1/2 -translate-y-1/2 bg-white border border-slate-200 rounded-lg shadow-xl py-2 z-50 min-w-[150px] animate-in fade-in zoom-in-95 duration-200">
+              <button
+                onClick={() => { onPrint('ticket'); setShowOptions(false); }}
+                className="w-full text-left px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 flex items-center gap-2"
+              >
+                <span className="material-symbols-outlined text-sm">print</span>
+                Re-imprimir Ticket
+              </button>
+              <button
+                onClick={() => { onPrint('invoice'); setShowOptions(false); }}
+                className="w-full text-left px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 flex items-center gap-2"
+              >
+                <span className="material-symbols-outlined text-sm">description</span>
+                Ver Factura A4
+              </button>
+            </div>
+          )}
+        </div>
       </td>
     </tr>
   );
