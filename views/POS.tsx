@@ -6,6 +6,7 @@ const DATABASE_ID = import.meta.env.VITE_APPWRITE_DATABASE_ID;
 const COLLECTION_INVENTORY_ID = import.meta.env.VITE_APPWRITE_COLLECTION_INVENTORY_ID;
 const COLLECTION_CATEGORIES_ID = import.meta.env.VITE_APPWRITE_COLLECTION_CATEGORIES_ID;
 const COLLECTION_SETTINGS_ID = import.meta.env.VITE_APPWRITE_COLLECTION_SETTINGS_ID;
+const COLLECTION_SALES_ID = import.meta.env.VITE_APPWRITE_COLLECTION_SALES_ID;
 const FUNCTION_PROCESS_SALE_ID = import.meta.env.VITE_APPWRITE_FUNCTION_PROCESS_SALE_ID;
 
 // Extended Product Data (Removed fixed mock data, using it as fallback for icon layout)
@@ -199,47 +200,51 @@ export default function POS() {
 
   // Payment Handlers
   const processSaleBackend = async (method: string) => {
-    if (!FUNCTION_PROCESS_SALE_ID) {
-      setPaymentStep('success'); // Fallback for demo if no function code configured
+    setPaymentStep('process');
+
+    if (!DATABASE_ID || !COLLECTION_SALES_ID || !COLLECTION_INVENTORY_ID) {
+      console.error('POS Error: Missing IDs', { DATABASE_ID, COLLECTION_SALES_ID, COLLECTION_INVENTORY_ID });
+      alert('Error: La configuración de la base de datos no está completa.');
+      setPaymentStep('select');
       return;
     }
 
-    setPaymentStep('process');
     try {
-      const payload = {
-        items: cart.map(item => ({ id: item.id, quantity: item.quantity, price: item.price })),
+      // 1. Create Sale Document Client-Side
+      const saleData = {
+        customerId: activeCustomer?.$id || activeCustomer?.id || null,
+        items: JSON.stringify(cart.map(item => ({ id: item.id, name: item.name, quantity: item.quantity, price: item.price }))),
         total: total,
-        customerId: activeCustomer?.$id || activeCustomer?.id,
-        paymentMethod: method
+        paymentMethod: method,
+        date: new Date().toISOString()
       };
 
-      const execution = await functions.createExecution(
-        FUNCTION_PROCESS_SALE_ID,
-        JSON.stringify(payload)
-      );
+      console.log('POS Creating sale document:', saleData);
+      await databases.createDocument(DATABASE_ID, COLLECTION_SALES_ID, ID.unique(), saleData);
 
-      console.log('POS Sale Execution Raw Response:', execution.responseBody);
+      // 2. Update Inventory Stock (Sequential for safety)
+      console.log('POS Updating inventory stock...');
+      for (const item of cart) {
+        try {
+          // Fetch latest stock to be safe
+          const product = await databases.getDocument(DATABASE_ID, COLLECTION_INVENTORY_ID, item.id);
+          const currentStock = parseInt(product.stock) || 0;
+          const newStock = Math.max(0, currentStock - item.quantity);
 
-      if (!execution.responseBody) {
-        throw new Error('Empry response from server. Check Appwrite Function logs.');
+          await databases.updateDocument(DATABASE_ID, COLLECTION_INVENTORY_ID, item.id, {
+            stock: newStock
+          });
+          console.log(`POS Updated stock for ${item.name}: ${newStock}`);
+        } catch (stockError) {
+          console.error(`POS Error updating stock for item ${item.id}:`, stockError);
+          // We continue with other items even if one fails
+        }
       }
 
-      let response;
-      try {
-        response = JSON.parse(execution.responseBody);
-      } catch (e) {
-        console.error('POS JSON Parse Error:', e, 'Raw Body:', execution.responseBody);
-        throw new Error(`Invalid server response (JSON parse error). Body: ${execution.responseBody.substring(0, 50)}...`);
-      }
-
-      if (response.success) {
-        setPaymentStep('success');
-      } else {
-        throw new Error(response.error || 'Failed to process sale');
-      }
+      setPaymentStep('success');
     } catch (error: any) {
-      console.error('Error processing sale:', error);
-      alert('Error processing sale: ' + (error.message || 'Unknown error'));
+      console.error('Error processing sale client-side:', error);
+      alert('Error al procesar la venta: ' + (error.message || 'Error desconocido'));
       setPaymentStep('select');
     }
   };
