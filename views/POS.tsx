@@ -1,10 +1,11 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useLanguage } from '../LanguageContext';
-import { databases, functions } from '@/lib/appwrite';
+import { databases, functions, ID, Query } from '@/lib/appwrite';
 
 const DATABASE_ID = import.meta.env.VITE_APPWRITE_DATABASE_ID;
 const COLLECTION_INVENTORY_ID = import.meta.env.VITE_APPWRITE_COLLECTION_INVENTORY_ID;
 const COLLECTION_CATEGORIES_ID = import.meta.env.VITE_APPWRITE_COLLECTION_CATEGORIES_ID;
+const COLLECTION_SETTINGS_ID = import.meta.env.VITE_APPWRITE_COLLECTION_SETTINGS_ID;
 const FUNCTION_PROCESS_SALE_ID = import.meta.env.VITE_APPWRITE_FUNCTION_PROCESS_SALE_ID;
 
 // Extended Product Data (Removed fixed mock data, using it as fallback for icon layout)
@@ -31,6 +32,10 @@ export default function POS() {
   const [activeCategoryKey, setActiveCategoryKey] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
   const [isMobileCartOpen, setIsMobileCartOpen] = useState(false);
+
+  // Settings state
+  const [taxRate, setTaxRate] = useState(18); // Default to 18% (common in DR)
+  const [currencySymbol, setCurrencySymbol] = useState('$');
 
   // Fetch products from Appwrite
   useEffect(() => {
@@ -61,7 +66,27 @@ export default function POS() {
     };
     fetchProducts();
     fetchCategories();
+    fetchBusinessSettings();
   }, []);
+
+  const fetchBusinessSettings = async () => {
+    if (!DATABASE_ID || !COLLECTION_SETTINGS_ID) return;
+    try {
+      const response = await databases.listDocuments(DATABASE_ID, COLLECTION_SETTINGS_ID, [
+        Query.limit(1)
+      ]);
+      if (response.documents.length > 0) {
+        const settings = response.documents[0];
+        setTaxRate(settings.taxRate || 0);
+        // Basic currency symbol logic
+        if (settings.currency?.includes('USD')) setCurrencySymbol('$');
+        else if (settings.currency?.includes('DOP')) setCurrencySymbol('RD$');
+        else setCurrencySymbol('$');
+      }
+    } catch (error) {
+      console.error('Error fetching business settings for POS:', error);
+    }
+  };
 
   const fetchCategories = async () => {
     if (!DATABASE_ID || !COLLECTION_CATEGORIES_ID) return;
@@ -126,7 +151,7 @@ export default function POS() {
 
   // Cart Calculations
   const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  const tax = subtotal * 0.15;
+  const tax = subtotal * (taxRate / 100);
   const total = subtotal + tax;
   const itemCount = cart.reduce((sum, item) => sum + item.quantity, 0);
 
