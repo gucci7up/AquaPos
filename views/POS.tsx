@@ -793,22 +793,21 @@ export default function POS() {
                     <span className="material-symbols-outlined text-6xl">check</span>
                   </div>
                   <h4 className="text-2xl font-black text-slate-900 mb-2">{t('pos.success')}</h4>
-                  <p className="text-slate-500 max-w-xs mx-auto mb-6">{t('pos.receiptSent')}</p>
+                  <p className="text-slate-500 text-sm mb-4">Imprimiendo ticket...</p>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full mb-8">
+                  <div className="flex flex-col gap-2 w-full mb-8">
                     <button
                       onClick={() => handlePrint('ticket')}
-                      className="flex items-center justify-center gap-2 p-4 border-2 border-slate-200 rounded-2xl hover:border-primary hover:text-primary transition-all font-bold text-sm"
+                      className="text-primary font-bold text-sm hover:underline flex items-center justify-center gap-2"
                     >
-                      <span className="material-symbols-outlined">receipt</span>
-                      Ticket (80mm)
+                      <span className="material-symbols-outlined text-sm">print</span>
+                      Re-imprimir Ticket (80mm)
                     </button>
                     <button
-                      onClick={() => handlePrint(printType === 'quote' ? 'quote' : 'invoice')}
-                      className="flex items-center justify-center gap-2 p-4 border-2 border-slate-200 rounded-2xl hover:border-primary hover:text-primary transition-all font-bold text-sm"
+                      onClick={() => handlePrint('invoice')}
+                      className="text-slate-400 font-bold text-xs hover:underline"
                     >
-                      <span className="material-symbols-outlined">picture_as_pdf</span>
-                      A4 ({printType === 'quote' ? 'Cotización' : 'Factura'})
+                      Ver Factura A4
                     </button>
                   </div>
 
@@ -829,5 +828,16 @@ export default function POS() {
         </div>
       )}
     </div>
+
+    {/* Hidden Print Container */ }
+  <div id="print-container" className="hidden">
+    {processedSaleData && (businessSettings) && (
+      <PrintTemplates
+        type={printType || 'ticket'}
+        data={processedSaleData}
+        businessSettings={businessSettings}
+      />
+    )}
+  </div>
   );
 }
