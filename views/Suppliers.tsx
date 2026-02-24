@@ -5,10 +5,10 @@ import { databases, functions, ID, Query } from '@/lib/appwrite';
 import { PrintTemplates } from '../components/PrintTemplates';
 
 const DATABASE_ID = import.meta.env.VITE_APPWRITE_DATABASE_ID;
-const COLLECTION_INVENTORY_ID = import.meta.env.VITE_APPWRITE_COLLECTION_INVENTORY_ID;
-const COLLECTION_SUPPLIERS_ID = import.meta.env.VITE_APPWRITE_COLLECTION_SUPPLIERS_ID;
-const COLLECTION_ORDERS_ID = import.meta.env.VITE_APPWRITE_COLLECTION_ORDERS_ID;
-const COLLECTION_SETTINGS_ID = import.meta.env.VITE_APPWRITE_COLLECTION_SETTINGS_ID;
+const COLLECTION_INVENTORY_ID = import.meta.env.VITE_APPWRITE_COLLECTION_INVENTORY_ID || 'inventory';
+const COLLECTION_SUPPLIERS_ID = import.meta.env.VITE_APPWRITE_COLLECTION_SUPPLIERS_ID || 'suppliers';
+const COLLECTION_ORDERS_ID = import.meta.env.VITE_APPWRITE_COLLECTION_ORDERS_ID || 'orders';
+const COLLECTION_SETTINGS_ID = import.meta.env.VITE_APPWRITE_COLLECTION_SETTINGS_ID || 'settings';
 const FUNCTION_RECEIVE_STOCK_ID = import.meta.env.VITE_APPWRITE_FUNCTION_RECEIVE_STOCK_ID;
 
 // Fallback mock items removed for Appwrite integration

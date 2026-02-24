@@ -5,8 +5,8 @@ import { databases, Query, ID } from '@/lib/appwrite';
 import { PrintTemplates } from '../components/PrintTemplates';
 
 const DATABASE_ID = import.meta.env.VITE_APPWRITE_DATABASE_ID;
-const COLLECTION_ID = import.meta.env.VITE_APPWRITE_COLLECTION_QUOTES_ID;
-const COLLECTION_SETTINGS_ID = import.meta.env.VITE_APPWRITE_COLLECTION_SETTINGS_ID;
+const COLLECTION_ID = import.meta.env.VITE_APPWRITE_COLLECTION_QUOTES_ID || 'quotes';
+const COLLECTION_SETTINGS_ID = import.meta.env.VITE_APPWRITE_COLLECTION_SETTINGS_ID || 'settings';
 
 // Mock Data removed
 const initialQuotes: any[] = [];
@@ -114,7 +114,7 @@ export default function Quotes() {
 
   const handleSaveQuote = async () => {
     if (!DATABASE_ID || !COLLECTION_ID) {
-      alert('Error: Configuración de Appwrite incompleta (ID de Colección de Cotizaciones faltante)');
+      // alert no longer needed with fallbacks
       return;
     }
 

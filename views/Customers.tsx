@@ -4,7 +4,7 @@ import UserMenu from '../UserMenu';
 import { databases, ID, Query } from '@/lib/appwrite';
 
 const DATABASE_ID = import.meta.env.VITE_APPWRITE_DATABASE_ID;
-const COLLECTION_ID = import.meta.env.VITE_APPWRITE_COLLECTION_CUSTOMERS_ID;
+const COLLECTION_ID = import.meta.env.VITE_APPWRITE_COLLECTION_CUSTOMERS_ID || 'customers';
 
 // Fallback/Legacy items removed for Appwrite integration
 const initialCustomers: any[] = [];
