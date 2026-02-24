@@ -5,6 +5,8 @@ import { databases, ID, Query } from '@/lib/appwrite';
 
 const DATABASE_ID = import.meta.env.VITE_APPWRITE_DATABASE_ID;
 const COLLECTION_ID = import.meta.env.VITE_APPWRITE_COLLECTION_CUSTOMERS_ID || 'customers';
+const COLLECTION_SALES_ID = import.meta.env.VITE_APPWRITE_COLLECTION_SALES_ID || 'sales';
+const COLLECTION_PAYMENTS_ID = import.meta.env.VITE_APPWRITE_COLLECTION_PAYMENTS_ID || 'payments';
 
 // Fallback/Legacy items removed for Appwrite integration
 const initialCustomers: any[] = [];
@@ -20,6 +22,92 @@ export default function Customers() {
   useEffect(() => {
     fetchCustomers();
   }, []);
+
+  const [customerHistory, setCustomerHistory] = useState<any[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+
+  useEffect(() => {
+    if (selectedId) {
+      fetchCustomerHistory(selectedId.toString());
+    }
+  }, [selectedId]);
+
+  const fetchCustomerHistory = async (customerId: string) => {
+    if (!DATABASE_ID || !COLLECTION_SALES_ID || !COLLECTION_PAYMENTS_ID) return;
+    try {
+      setHistoryLoading(true);
+      const [salesRes, paymentsRes] = await Promise.all([
+        databases.listDocuments(DATABASE_ID, COLLECTION_SALES_ID, [
+          Query.equal('customerId', customerId),
+          Query.orderDesc('date'),
+          Query.limit(50)
+        ]),
+        databases.listDocuments(DATABASE_ID, COLLECTION_PAYMENTS_ID, [
+          Query.equal('customerId', customerId),
+          Query.orderDesc('date'),
+          Query.limit(50)
+        ])
+      ]);
+
+      const sales = salesRes.documents.map(d => ({ ...d, type: 'sale', date: d.date || d.$createdAt }));
+      const payments = paymentsRes.documents.map(d => ({ ...d, type: 'payment', date: d.date || d.$createdAt }));
+
+      const combined = [...sales, ...payments].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      setCustomerHistory(combined);
+    } catch (error) {
+      console.error('Error fetching history:', error);
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  const handlePayment = async () => {
+    if (!DATABASE_ID || !COLLECTION_PAYMENTS_ID || !selectedCustomer) return;
+
+    setIsProcessingPayment(true);
+    try {
+      const amount = parseFloat(paymentAmount);
+      if (isNaN(amount) || amount <= 0) {
+        alert('Por favor, ingresa un monto válido.');
+        return;
+      }
+
+      const paymentData = {
+        customerId: selectedCustomer.$id || selectedCustomer.id,
+        customerName: selectedCustomer.name,
+        amount: amount,
+        method: paymentMethod,
+        notes: paymentNotes,
+        date: new Date().toISOString(),
+      };
+
+      await databases.createDocument(DATABASE_ID, COLLECTION_PAYMENTS_ID, ID.unique(), paymentData);
+
+      // REDUCIR el crédito del cliente (Abono)
+      const currentCustomerDoc = await databases.getDocument(DATABASE_ID, COLLECTION_ID, selectedCustomer.$id || selectedCustomer.id);
+      const newCredit = Math.max(0, (currentCustomerDoc.credit || 0) - amount);
+
+      await databases.updateDocument(DATABASE_ID, COLLECTION_ID, selectedCustomer.$id || selectedCustomer.id, {
+        credit: newCredit
+      });
+
+      alert('Abono procesado con éxito.');
+
+      await fetchCustomers();
+      if (selectedId) {
+        await fetchCustomerHistory(selectedId.toString());
+      }
+      setIsPaymentModalOpen(false);
+      setPaymentAmount('');
+      setPaymentMethod('Cash');
+      setPaymentNotes('');
+    } catch (error: any) {
+      console.error('Error processing payment:', error);
+      alert('Error al procesar el abono: ' + (error.message || 'Error desconocido'));
+    } finally {
+      setIsProcessingPayment(false);
+    }
+  };
 
   const fetchCustomers = async () => {
     if (!DATABASE_ID || !COLLECTION_ID) {
@@ -59,6 +147,13 @@ export default function Customers() {
   const selectedCustomer = useMemo(() =>
     customers.find(c => c.id === selectedId) || customers[0],
     [customers, selectedId]);
+
+  // Payment (Abono) Modal State
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [paymentAmount, setPaymentAmount] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState('Cash');
+  const [paymentNotes, setPaymentNotes] = useState('');
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
 
   const filteredCustomers = useMemo(() => {
     return customers.filter(c =>
@@ -277,11 +372,21 @@ export default function Customers() {
               <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">{t('customers.table.ltv')}</p>
               <p className="text-lg font-bold text-slate-900">${selectedCustomer.ltv.toLocaleString()}</p>
             </div>
-            <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
-              <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Pending Credit</p>
-              <p className={`text-lg font-bold ${selectedCustomer.credit > 0 ? 'text-amber-500' : 'text-emerald-500'}`}>
-                ${selectedCustomer.credit.toLocaleString()}
-              </p>
+            <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex flex-col justify-between">
+              <div>
+                <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Pending Credit</p>
+                <p className={`text-lg font-bold ${selectedCustomer.credit > 0 ? 'text-amber-500' : 'text-emerald-500'}`}>
+                  ${selectedCustomer.credit.toLocaleString()}
+                </p>
+              </div>
+              {selectedCustomer.credit > 0 && (
+                <button
+                  onClick={() => setIsPaymentModalOpen(true)}
+                  className="mt-2 w-full py-1 text-[10px] font-bold bg-primary text-white rounded-md hover:brightness-105 transition-all"
+                >
+                  {t('customers.makePayment') || 'ABONAR'}
+                </button>
+              )}
             </div>
           </div>
 
@@ -294,40 +399,38 @@ export default function Customers() {
 
             {activeTab === 'history' && (
               <div className="space-y-4">
-                {selectedCustomer.creditHistory && selectedCustomer.creditHistory.length > 0 ? (
-                  selectedCustomer.creditHistory.map((historyItem: any) => (
-                    <div key={historyItem.id} className="flex gap-4 p-3 bg-slate-50 rounded-xl border border-slate-100">
-                      <div className="shrink-0 size-10 bg-white rounded-lg flex items-center justify-center border border-slate-200">
-                        <span className="material-symbols-outlined text-slate-400">request_quote</span>
+                {historyLoading ? (
+                  <div className="flex justify-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                  </div>
+                ) : customerHistory.length > 0 ? (
+                  customerHistory.map((item: any) => (
+                    <div key={item.$id} className="flex gap-4 p-3 bg-slate-50 rounded-xl border border-slate-100">
+                      <div className={`shrink-0 size-10 rounded-lg flex items-center justify-center border ${item.type === 'sale' ? 'bg-blue-50 border-blue-100' : 'bg-emerald-50 border-emerald-100'}`}>
+                        <span className="material-symbols-outlined text-sm">
+                          {item.type === 'sale' ? 'shopping_bag' : 'payments'}
+                        </span>
                       </div>
-                      <div className="flex-1">
-                        <div className="flex justify-between">
-                          <p className="text-sm font-bold text-slate-900">Credit Sale #{historyItem.id}</p>
-                          <StatusBadge status={historyItem.status} />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex justify-between items-start">
+                          <p className="text-sm font-bold text-slate-900 truncate">
+                            {item.type === 'sale' ? `Venta #${item.$id.substring(0, 8)}` : `Abono (${item.method})`}
+                          </p>
+                          <span className="text-[10px] font-medium text-slate-400 shrink-0">
+                            {new Date(item.date).toLocaleDateString()}
+                          </span>
                         </div>
-                        <p className="text-xs text-slate-500 mt-1">Due Date: <span className="font-bold text-slate-700">{historyItem.dueDate}</span></p>
-                        <p className="text-xs text-slate-500">Amount: ${historyItem.amount.toFixed(2)}</p>
+                        <p className={`text-xs font-bold mt-1 ${item.type === 'sale' ? 'text-slate-700' : 'text-emerald-600'}`}>
+                          {item.type === 'sale' ? '-' : '+'}${item.amount || item.total || 0}
+                        </p>
+                        {item.paymentMethod === 'Credit' && (
+                          <span className="text-[10px] text-amber-600 font-bold uppercase">A Crédito</span>
+                        )}
                       </div>
                     </div>
                   ))
                 ) : (
-                  <p className="text-sm text-slate-400 text-center py-4">No credit history found.</p>
-                )}
-
-                {/* Fallback Static Items if history is empty for demo purposes on others */}
-                {!selectedCustomer.creditHistory && (
-                  <div className="flex gap-4">
-                    <div className="shrink-0 size-10 bg-slate-100 rounded-lg flex items-center justify-center">
-                      <span className="material-symbols-outlined text-slate-400">shopping_bag</span>
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex justify-between">
-                        <p className="text-sm font-bold text-slate-900">Order #AQ-92831</p>
-                        <span className="text-[10px] font-medium text-slate-400 uppercase">Oct 24, 2023</span>
-                      </div>
-                      <p className="text-xs text-slate-500 mt-0.5">3 items • $1,240.55 • Paid</p>
-                    </div>
-                  </div>
+                  <p className="text-sm text-slate-400 text-center py-4">No se encontró historial.</p>
                 )}
               </div>
             )}
@@ -431,6 +534,76 @@ export default function Customers() {
             <div className="p-6 border-t border-slate-100 bg-slate-50 flex gap-3 justify-end">
               <button onClick={() => setIsModalOpen(false)} className="px-4 py-2 border border-slate-200 bg-white text-slate-700 font-bold rounded-lg hover:bg-slate-50">Cancel</button>
               <button onClick={handleSave} className="px-6 py-2 bg-primary text-white font-bold rounded-lg hover:brightness-105 shadow-lg shadow-primary/20">{t('customers.saveProfile')}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Payment Modal */}
+      {isPaymentModalOpen && (
+        <div className="absolute inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden flex flex-col">
+            <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-primary/5">
+              <div>
+                <h3 className="text-xl font-black text-slate-900">Registrar Abono</h3>
+                <p className="text-xs text-slate-500">Saldo actual: ${selectedCustomer.credit?.toLocaleString()}</p>
+              </div>
+              <button onClick={() => setIsPaymentModalOpen(false)} className="text-slate-400 hover:text-slate-600">
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-500 uppercase">Monto a Pagar</label>
+                <input
+                  type="number"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-lg p-3 text-lg font-bold text-primary focus:border-primary outline-none"
+                  placeholder="0.00"
+                  value={paymentAmount}
+                  onChange={e => setPaymentAmount(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-500 uppercase">Método de Pago</label>
+                <select
+                  className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-sm focus:border-primary outline-none"
+                  value={paymentMethod}
+                  onChange={e => setPaymentMethod(e.target.value)}
+                >
+                  <option value="Cash">Efectivo</option>
+                  <option value="Card">Tarjeta</option>
+                  <option value="Transfer">Transferencia</option>
+                </select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-500 uppercase">Notas / Referencia</label>
+                <textarea
+                  className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-sm focus:border-primary outline-none h-20 resize-none"
+                  placeholder="Ej: Pago factura #123"
+                  value={paymentNotes}
+                  onChange={e => setPaymentNotes(e.target.value)}
+                ></textarea>
+              </div>
+            </div>
+            <div className="p-6 border-t border-slate-100 bg-slate-50 flex flex-col gap-3">
+              <button
+                onClick={handlePayment}
+                disabled={isProcessingPayment}
+                className="w-full py-3 bg-primary text-white font-bold rounded-xl hover:brightness-105 shadow-lg shadow-primary/20 disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {isProcessingPayment ? (
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                ) : (
+                  <span className="material-symbols-outlined">save</span>
+                )}
+                Confirmar Abono
+              </button>
+              <button
+                onClick={() => setIsPaymentModalOpen(false)}
+                className="w-full py-2 text-slate-500 text-sm font-bold hover:text-slate-700"
+              >
+                Cancelar
+              </button>
             </div>
           </div>
         </div>

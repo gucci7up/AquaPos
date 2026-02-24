@@ -314,13 +314,36 @@ export default function POS() {
       console.log('POS Creating sale document:', saleData);
       const doc = await databases.createDocument(DATABASE_ID, COLLECTION_SALES_ID, ID.unique(), saleData);
 
-      // Store for printing (with actual array, not JSON string)
       setProcessedSaleData({
         ...saleData,
         items: cart.map(item => ({ id: item.id, name: item.name, quantity: item.quantity, price: item.price })),
         id: doc.$id
       });
       setPrintType('ticket');
+
+      // 1.5 Update Customer LTV and Credit (if applicable)
+      if (activeCustomer && COLLECTION_CUSTOMERS_ID) {
+        try {
+          console.log('POS Updating customer stats...', activeCustomer.id);
+          const customerDoc = await databases.getDocument(DATABASE_ID, COLLECTION_CUSTOMERS_ID, activeCustomer.id);
+          const currentLtv = parseFloat(customerDoc.ltv) || 0;
+          const currentCredit = parseFloat(customerDoc.credit) || 0;
+
+          const updateData: any = {
+            ltv: currentLtv + total
+          };
+
+          if (method === 'Credit') {
+            updateData.credit = currentCredit + total;
+            console.log(`POS Incrementing customer credit by ${total}`);
+          }
+
+          await databases.updateDocument(DATABASE_ID, COLLECTION_CUSTOMERS_ID, activeCustomer.id, updateData);
+          console.log('POS Customer stats updated successfully');
+        } catch (customerUpdateError) {
+          console.error('POS Error updating customer stats:', customerUpdateError);
+        }
+      }
 
       // 2. Update Inventory Stock (Sequential for safety)
       console.log('POS Updating inventory stock...');
