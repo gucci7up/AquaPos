@@ -121,7 +121,11 @@ export default function POS() {
       console.log('POS Creating quote document:', quoteData);
       const doc = await databases.createDocument(DATABASE_ID, COLLECTION_QUOTES_ID, ID.unique(), quoteData);
 
-      setProcessedSaleData({ ...quoteData, id: doc.$id });
+      setProcessedSaleData({
+        ...quoteData,
+        items: cart.map(item => ({ id: item.id, name: item.name, quantity: item.quantity, price: item.price })),
+        id: doc.$id
+      });
       setPrintType('quote');
       setPaymentStep('success'); // Use success step to show print options
     } catch (error: any) {
@@ -236,8 +240,15 @@ export default function POS() {
     setPrintType(type);
     // Give state a moment to update and render the print container
     setTimeout(() => {
-      const printContents = document.getElementById('print-container')?.innerHTML;
-      if (!printContents) return;
+      const printContainer = document.getElementById('print-container');
+      const printContents = printContainer?.innerHTML;
+
+      console.log('POS Printing - Container innerHTML length:', printContents?.length || 0);
+
+      if (!printContents || printContents.trim() === "") {
+        console.error('POS Printing - Empty print container');
+        return;
+      }
 
       const printWindow = window.open('', '_blank', 'width=800,height=600');
       if (printWindow) {
@@ -264,7 +275,7 @@ export default function POS() {
         `);
         printWindow.document.close();
       }
-    }, 100);
+    }, 300);
   };
 
   const filteredCustomers = customers.filter(c =>
@@ -296,8 +307,12 @@ export default function POS() {
       console.log('POS Creating sale document:', saleData);
       const doc = await databases.createDocument(DATABASE_ID, COLLECTION_SALES_ID, ID.unique(), saleData);
 
-      // Store for printing
-      setProcessedSaleData({ ...saleData, id: doc.$id });
+      // Store for printing (with actual array, not JSON string)
+      setProcessedSaleData({
+        ...saleData,
+        items: cart.map(item => ({ id: item.id, name: item.name, quantity: item.quantity, price: item.price })),
+        id: doc.$id
+      });
       setPrintType('ticket');
 
       // 2. Update Inventory Stock (Sequential for safety)
@@ -832,11 +847,11 @@ export default function POS() {
 
       {/* Hidden Print Container */}
       <div id="print-container" className="hidden">
-        {processedSaleData && businessSettings && (
+        {processedSaleData && (
           <PrintTemplates
             type={printType || 'ticket'}
             data={processedSaleData}
-            businessSettings={businessSettings}
+            businessSettings={businessSettings || {}}
           />
         )}
       </div>
