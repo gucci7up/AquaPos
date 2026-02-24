@@ -40,8 +40,8 @@ export default function Sales() {
       setTransactions(response.documents.map(doc => ({
         ...doc,
         id: doc.$id,
-        name: doc.customerId || 'Guest',
-        initials: (doc.customerId || 'G').substring(0, 2).toUpperCase(),
+        name: doc.customerName || doc.customerId || 'Guest',
+        initials: (doc.customerName || doc.customerId || 'G').substring(0, 2).toUpperCase(),
         method: doc.paymentMethod || 'Cash',
         methodIcon: doc.paymentMethod === 'Card' ? 'credit_card' : 'payments',
         amount: doc.total || 0,
@@ -59,23 +59,18 @@ export default function Sales() {
   const filteredData = useMemo(() => {
     let data = transactions;
 
-    // Filter by Date (Mock logic using timestamp cutoff)
-    const todayStart = 1730438400000; // Approx start of Nov 1st 2024 for demo
-    if (dateRange === 'Today') {
-      data = data.filter(t => t.timestamp >= todayStart);
-    }
-
     // Filter by Search
     if (searchQuery) {
       const lowerQuery = searchQuery.toLowerCase();
       data = data.filter(t =>
         t.name.toLowerCase().includes(lowerQuery) ||
-        t.id.toLowerCase().includes(lowerQuery)
+        t.id.toLowerCase().includes(lowerQuery) ||
+        (t.customerId && t.customerId.toLowerCase().includes(lowerQuery))
       );
     }
 
     return data;
-  }, [searchQuery, dateRange]);
+  }, [searchQuery, transactions]);
 
   // Statistics Calculations
   const totalRevenue = filteredData.reduce((sum, t) => sum + t.amount, 0);

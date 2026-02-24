@@ -213,6 +213,7 @@ export default function POS() {
       // 1. Create Sale Document Client-Side
       const saleData = {
         customerId: activeCustomer?.$id || activeCustomer?.id || null,
+        customerName: activeCustomer?.name || 'Guest',
         items: JSON.stringify(cart.map(item => ({ id: item.id, name: item.name, quantity: item.quantity, price: item.price }))),
         total: total,
         paymentMethod: method,
