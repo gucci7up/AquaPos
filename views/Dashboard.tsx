@@ -13,7 +13,9 @@ const COLLECTION_SALES_ID = import.meta.env.VITE_APPWRITE_COLLECTION_SALES_ID ||
 const overduePayments = 0;
 
 export default function Dashboard() {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+  const isEs = language === 'es';
+
   const navigate = useNavigate();
   const [period, setPeriod] = useState<'current' | 'last'>('current');
   const [searchQuery, setSearchQuery] = useState('');
@@ -83,26 +85,27 @@ export default function Dashboard() {
 
   // Dynamic Chart Data mapping real sales to days
   const chartData = useMemo(() => {
-    // Initialize days
     const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-    const dataMap: any = {};
-    days.forEach(d => dataMap[d] = { value: 0, prev: 0 });
+    const dayLabels = isEs
+      ? ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
+      : ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    const dataMap: Record<string, number> = {};
+    days.forEach(d => { dataMap[d] = 0; });
 
-    // Populate with real data if available
     transactions.forEach((tx: any) => {
       const date = new Date(tx.$createdAt || tx.date);
-      const dayName = days[(date.getDay() + 6) % 7]; // Adjusted for Mon-Sun
-      if (dataMap[dayName]) {
-        dataMap[dayName].value += tx.total || 0;
+      const dayName = days[(date.getDay() + 6) % 7];
+      if (dayName in dataMap) {
+        dataMap[dayName] += Number(tx.total) || 0;
       }
     });
 
-    return days.map(d => ({
-      name: t(`common.days.${d}`),
-      value: dataMap[d].value,
-      prev: 0
+    return days.map((d, i) => ({
+      name: dayLabels[i],
+      value: Number(dataMap[d]) || 0,
+      prev: 0,
     }));
-  }, [transactions, t]);
+  }, [transactions, language]);
 
   const stats = useMemo(() => {
     const totalSales = transactions.reduce((acc, tx) => acc + (tx.total || 0), 0);
@@ -269,7 +272,7 @@ export default function Dashboard() {
                       formatter={(value: any) => [`$${value}`, 'Revenue']}
                     />
                     <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 12 }} />
-                    <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 12 }} prefix="$" />
+                    <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 12 }} tickFormatter={(v) => `$${v}`} />
                     <CartesianGrid vertical={false} stroke="#f1f5f9" />
                     <Area
                       type="monotone"
