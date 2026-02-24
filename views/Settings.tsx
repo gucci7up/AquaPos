@@ -1,10 +1,17 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useLanguage } from '../LanguageContext';
 import UserMenu from '../UserMenu';
-import { databases, functions, ID, Query } from '@/lib/appwrite';
+import { databases, storage, functions, ID, Query } from '@/lib/appwrite';
 
 const DATABASE_ID = import.meta.env.VITE_APPWRITE_DATABASE_ID;
 const COLLECTION_SETTINGS_ID = import.meta.env.VITE_APPWRITE_COLLECTION_SETTINGS_ID || 'settings';
+const BUCKET_ID = import.meta.env.VITE_APPWRITE_BUCKET_IMAGES_ID || 'products';
+const ENDPOINT = import.meta.env.VITE_APPWRITE_ENDPOINT;
+const PROJECT_ID = import.meta.env.VITE_APPWRITE_PROJECT_ID;
+
+// Build permanent public preview URL for an Appwrite Storage file
+const getFilePreviewUrl = (fileId: string) =>
+    `${ENDPOINT}/storage/buckets/${BUCKET_ID}/files/${fileId}/preview?project=${PROJECT_ID}&width=800`;
 
 // Mock Data
 const initialTeam = [
@@ -42,7 +49,7 @@ export default function Settings() {
     const [settingsDocId, setSettingsDocId] = useState<string | null>(null);
     const [isSaving, setIsSaving] = useState(false);
 
-    // State: Branding
+    // State: Branding — stores preview URLs for display
     const [branding, setBranding] = useState({
         loginBg: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?q=80&w=2070&auto=format&fit=crop',
         logoUrl: '',
@@ -50,6 +57,12 @@ export default function Settings() {
         landingHero: 'https://lh3.googleusercontent.com/aida-public/AB6AXuA7lYcDqoIsNqzIvtzR5LqLXZ4JlKkCRqIagznKEbsvnI6pQ0x3chrwmsp2U2cowE7Ll7tO1aysWfCu6OAs8JWAmc3l7dTPPSPlpAo47gaVg6U8y2iE797oWUBO7ciQyHbV12LoYTMIPIG8GMEZd9lTyZvzWK_ruTQvnXT0-mnS1ALu5_BS9IBUSudsfL_KcDvFjHWumWoiUFxNRQHnf0DoZ7rRh823k53HIdQDHsKEFehywkn_mMIGNhvfoyrX86Qwx8nLDCcVw3s',
         landingFeature: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBWvk9CAUtPBscww0R9xdnm16iCqTl3vQGzRcMDKb3AkQXIrubU3SwcHYdhUU41WiP2xhBPSZ3eTSeBHgAmArSU4b3y3-SBg3LgvQWtyr1YiUuMxCOXU4oAUQ5xgFWsHahkNg0berzKsxAomp43EQs9flRJVbHnlYxhEfKQNvTI4VU7J8dg5rEiY5qewE8Sw7PWbzcP2PO8Ds0LPhwuthyMeF-wdGACHbd5ZmTdiRlNLV42wfTy31U0QxmBqpdcsVYtVdvda09XJx8'
     });
+    // Stores the Appwrite Storage file IDs for each branding image (for persistence)
+    const [brandingFileIds, setBrandingFileIds] = useState<Record<string, string>>({
+        loginBg: '', logoUrl: '', landingHero: '', landingFeature: ''
+    });
+    // Track which image slot is currently uploading
+    const [uploadingKey, setUploadingKey] = useState<string | null>(null);
 
     // State: Team & Users
     const [teamMembers, setTeamMembers] = useState(initialTeam);
@@ -93,13 +106,31 @@ export default function Settings() {
                 const doc = response.documents[0];
                 setSettingsDocId(doc.$id);
                 setProfileData({
-                    businessName: doc.businessName,
-                    legalId: doc.legalId,
-                    email: doc.email,
-                    currency: doc.currency,
+                    businessName: doc.businessName || '',
+                    legalId: doc.legalId || '',
+                    email: doc.email || '',
+                    currency: doc.currency || 'DOP (Dominican Peso)',
                     taxRate: doc.taxRate || 0,
-                    address: doc.address
+                    address: doc.address || ''
                 });
+                // Restore saved file IDs and rebuild preview URLs
+                const savedIds: Record<string, string> = {};
+                const savedUrls: Partial<typeof branding> = {};
+                (['logoUrl', 'loginBg', 'landingHero', 'landingFeature'] as const).forEach(key => {
+                    const fileId = doc[`branding_${key}`];
+                    if (fileId) {
+                        savedIds[key] = fileId;
+                        savedUrls[key] = getFilePreviewUrl(fileId);
+                    }
+                });
+                if (Object.keys(savedIds).length > 0) {
+                    setBrandingFileIds(prev => ({ ...prev, ...savedIds }));
+                    setBranding(prev => ({ ...prev, ...savedUrls }));
+                }
+                // Restore primary color
+                if (doc.branding_primaryColor) {
+                    setBranding(prev => ({ ...prev, primaryColor: doc.branding_primaryColor }));
+                }
             }
         } catch (error) {
             console.error('Error fetching settings:', error);
@@ -121,10 +152,19 @@ export default function Settings() {
 
         setIsSaving(true);
         try {
+            // Include branding file IDs and primary color in settings doc
+            const dataToSave = {
+                ...profileData,
+                branding_logoUrl: brandingFileIds.logoUrl || null,
+                branding_loginBg: brandingFileIds.loginBg || null,
+                branding_landingHero: brandingFileIds.landingHero || null,
+                branding_landingFeature: brandingFileIds.landingFeature || null,
+                branding_primaryColor: branding.primaryColor,
+            };
             if (settingsDocId) {
-                await databases.updateDocument(DATABASE_ID, COLLECTION_SETTINGS_ID, settingsDocId, profileData);
+                await databases.updateDocument(DATABASE_ID, COLLECTION_SETTINGS_ID, settingsDocId, dataToSave);
             } else {
-                const res = await databases.createDocument(DATABASE_ID, COLLECTION_SETTINGS_ID, ID.unique(), profileData);
+                const res = await databases.createDocument(DATABASE_ID, COLLECTION_SETTINGS_ID, ID.unique(), dataToSave);
                 setSettingsDocId(res.$id);
             }
             alert(t('settings.savedSuccess'));
@@ -176,10 +216,48 @@ export default function Settings() {
         setBranding(prev => ({ ...prev, [key]: value }));
     };
 
-    const handleFileUpload = (key: string, e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files && e.target.files[0]) {
-            const fileUrl = URL.createObjectURL(e.target.files[0]);
-            setBranding(prev => ({ ...prev, [key]: fileUrl }));
+    // Upload image to Appwrite Storage → store fileId → update preview URL
+    const handleFileUpload = async (key: string, e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file || !BUCKET_ID) return;
+
+        // Show instant local preview immediately
+        const localUrl = URL.createObjectURL(file);
+        setBranding(prev => ({ ...prev, [key]: localUrl }));
+        setUploadingKey(key);
+
+        try {
+            // Delete previous file if exists
+            const prevFileId = brandingFileIds[key];
+            if (prevFileId) {
+                try { await storage.deleteFile(BUCKET_ID, prevFileId); } catch { }
+            }
+
+            // Upload new file
+            const result = await storage.createFile(BUCKET_ID, ID.unique(), file);
+            const fileId = result.$id;
+
+            // Save fileId and update preview with permanent URL
+            setBrandingFileIds(prev => ({ ...prev, [key]: fileId }));
+            setBranding(prev => ({ ...prev, [key]: getFilePreviewUrl(fileId) }));
+
+            // Auto-save the new fileId to the settings document immediately
+            if (DATABASE_ID && COLLECTION_SETTINGS_ID) {
+                const patch = { [`branding_${key}`]: fileId };
+                if (settingsDocId) {
+                    await databases.updateDocument(DATABASE_ID, COLLECTION_SETTINGS_ID, settingsDocId, patch);
+                } else {
+                    const res = await databases.createDocument(DATABASE_ID, COLLECTION_SETTINGS_ID, ID.unique(), patch);
+                    setSettingsDocId(res.$id);
+                }
+            }
+        } catch (error: any) {
+            console.error('Error uploading image:', error);
+            alert('Error al subir imagen: ' + (error.message || error));
+        } finally {
+            setUploadingKey(null);
+            // Reset file input so same file can be re-selected
+            e.target.value = '';
         }
     };
 
@@ -403,9 +481,9 @@ export default function Settings() {
                                         <ImageManager
                                             label="Login Background Image"
                                             value={branding.loginBg}
-                                            onChange={(val) => handleBrandingChange('loginBg', val)}
-                                            onUpload={(e) => handleFileUpload('loginBg', e)}
-                                            helpText="Recommended size: 1920x1080px (JPG, PNG)"
+                                            onUpload={(e: any) => handleFileUpload('loginBg', e)}
+                                            helpText="Recomendado: 1920x1080px (JPG, PNG)"
+                                            isUploading={uploadingKey === 'loginBg'}
                                         />
                                         <div className="space-y-6">
                                             <div className="space-y-2">
@@ -420,9 +498,11 @@ export default function Settings() {
                                                     </div>
                                                     {/* Upload controls */}
                                                     <div className="flex flex-col gap-2 flex-1">
-                                                        <label className="cursor-pointer flex items-center gap-2 px-4 py-2 bg-primary text-white text-sm font-bold rounded-lg hover:brightness-105 transition-all w-fit">
-                                                            <span className="material-symbols-outlined text-sm">upload</span>
-                                                            Subir imagen
+                                                        <label className={`cursor-pointer flex items-center gap-2 px-4 py-2 text-white text-sm font-bold rounded-lg transition-all w-fit ${uploadingKey === 'logoUrl' ? 'bg-primary/60 cursor-wait' : 'bg-primary hover:brightness-105'}`}>
+                                                            <span className={`material-symbols-outlined text-sm ${uploadingKey === 'logoUrl' ? 'animate-spin' : ''}`}>
+                                                                {uploadingKey === 'logoUrl' ? 'sync' : 'upload'}
+                                                            </span>
+                                                            {uploadingKey === 'logoUrl' ? 'Subiendo...' : 'Subir imagen'}
                                                             <input
                                                                 type="file"
                                                                 accept="image/*"
@@ -472,16 +552,16 @@ export default function Settings() {
                                             <ImageManager
                                                 label={t('settings.branding.heroImage')}
                                                 value={branding.landingHero}
-                                                onChange={(val) => handleBrandingChange('landingHero', val)}
-                                                onUpload={(e) => handleFileUpload('landingHero', e)}
-                                                helpText="Displayed in the main hero section."
+                                                onUpload={(e: any) => handleFileUpload('landingHero', e)}
+                                                helpText="Se muestra en la sección hero principal."
+                                                isUploading={uploadingKey === 'landingHero'}
                                             />
                                             <ImageManager
                                                 label={t('settings.branding.featureImage')}
                                                 value={branding.landingFeature}
-                                                onChange={(val) => handleBrandingChange('landingFeature', val)}
-                                                onUpload={(e) => handleFileUpload('landingFeature', e)}
-                                                helpText="Floating image for mobile/feature section."
+                                                onUpload={(e: any) => handleFileUpload('landingFeature', e)}
+                                                helpText="Imagen flotante para sección móvil/feature."
+                                                isUploading={uploadingKey === 'landingFeature'}
                                             />
                                         </div>
                                     </div>
@@ -787,8 +867,7 @@ const TabButton = ({ id, label, icon, active, onClick }: any) => (
 );
 
 // New Helper Component for Image Management (URL + File Upload)
-const ImageManager = ({ label, value, onChange, onUpload, helpText }: any) => {
-    const { t } = useLanguage();
+const ImageManager = ({ label, value, onUpload, helpText, isUploading }: any) => {
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     return (
@@ -802,35 +881,31 @@ const ImageManager = ({ label, value, onChange, onUpload, helpText }: any) => {
                         <span className="material-symbols-outlined text-4xl">image</span>
                     </div>
                 )}
-                <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-                    <p className="text-white font-bold text-sm">Preview</p>
-                </div>
+                {/* Loading overlay */}
+                {isUploading && (
+                    <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center gap-2">
+                        <span className="material-symbols-outlined text-white text-3xl animate-spin">sync</span>
+                        <p className="text-white font-bold text-sm">Subiendo...</p>
+                    </div>
+                )}
             </div>
 
-            <div className="space-y-2">
+            <div>
                 <input
-                    value={value}
-                    onChange={(e) => onChange(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-primary"
-                    placeholder={t('settings.branding.enterUrl')}
+                    type="file"
+                    ref={fileInputRef}
+                    className="hidden"
+                    accept="image/*"
+                    onChange={onUpload}
                 />
-                <div className="flex items-center gap-2">
-                    <span className="text-xs text-slate-400 uppercase font-bold">{t('settings.branding.or')}</span>
-                    <input
-                        type="file"
-                        ref={fileInputRef}
-                        className="hidden"
-                        accept="image/*"
-                        onChange={onUpload}
-                    />
-                    <button
-                        onClick={() => fileInputRef.current?.click()}
-                        className="flex-1 py-2 border border-dashed border-slate-300 rounded-lg text-xs font-bold text-slate-600 hover:bg-slate-50 hover:border-slate-400 transition-all flex items-center justify-center gap-2"
-                    >
-                        <span className="material-symbols-outlined text-sm">upload_file</span>
-                        {t('settings.branding.uploadLocal')}
-                    </button>
-                </div>
+                <button
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isUploading}
+                    className="w-full py-2 border border-dashed border-slate-300 rounded-lg text-xs font-bold text-slate-600 hover:bg-slate-50 hover:border-primary hover:text-primary transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-wait"
+                >
+                    <span className="material-symbols-outlined text-sm">{value ? 'swap_horiz' : 'upload_file'}</span>
+                    {isUploading ? 'Subiendo…' : value ? 'Cambiar imagen' : 'Subir imagen local'}
+                </button>
             </div>
             {helpText && <p className="text-xs text-slate-400">{helpText}</p>}
         </div>
