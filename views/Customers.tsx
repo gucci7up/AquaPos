@@ -111,8 +111,7 @@ export default function Customers() {
         const newDoc = {
           ...submissionData,
           ltv: 0,
-          credit: 0,
-          image: `https://ui-avatars.com/api/?background=random&name=${encodeURIComponent(formData.name)}`
+          credit: 0
         };
         await databases.createDocument(DATABASE_ID, COLLECTION_ID, ID.unique(), newDoc);
       }
