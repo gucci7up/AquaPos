@@ -14,7 +14,7 @@ const FUNCTION_PROCESS_SALE_ID = import.meta.env.VITE_APPWRITE_FUNCTION_PROCESS_
 // Extended Product Data (Removed fixed mock data, using it as fallback for icon layout)
 const mockProductsFallback: any[] = [];
 
-const COLLECTION_CUSTOMERS_ID = import.meta.env.VITE_APPWRITE_COLLECTION_CUSTOMERS_ID;
+const COLLECTION_CUSTOMERS_ID = import.meta.env.VITE_APPWRITE_COLLECTION_CUSTOMERS_ID || 'customers';
 
 export default function POS() {
   const { t } = useLanguage();

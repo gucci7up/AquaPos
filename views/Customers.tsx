@@ -61,6 +61,46 @@ export default function Customers() {
     }
   };
 
+  const handleSyncBalances = async () => {
+    if (!DATABASE_ID || !COLLECTION_ID || !COLLECTION_SALES_ID || !COLLECTION_PAYMENTS_ID || !selectedCustomer) return;
+
+    setLoading(true);
+    try {
+      // Fetch ALL sales and payments for this customer
+      const [salesRes, paymentsRes] = await Promise.all([
+        databases.listDocuments(DATABASE_ID, COLLECTION_SALES_ID, [
+          Query.equal('customerId', selectedCustomer.id),
+          Query.limit(100)
+        ]),
+        databases.listDocuments(DATABASE_ID, COLLECTION_PAYMENTS_ID, [
+          Query.equal('customerId', selectedCustomer.id),
+          Query.limit(100)
+        ])
+      ]);
+
+      const totalLtv = salesRes.documents.reduce((sum, d) => sum + (d.total || 0), 0);
+      const totalCreditSales = salesRes.documents
+        .filter(d => d.paymentMethod === 'Credit')
+        .reduce((sum, d) => sum + (d.total || 0), 0);
+      const totalPayments = paymentsRes.documents.reduce((sum, d) => sum + (d.amount || 0), 0);
+
+      const realCredit = Math.max(0, totalCreditSales - totalPayments);
+
+      await databases.updateDocument(DATABASE_ID, COLLECTION_ID, selectedCustomer.id, {
+        ltv: totalLtv,
+        credit: realCredit
+      });
+
+      alert(`Sincronización completa:\nLTV: $${totalLtv}\nCrédito: $${realCredit}`);
+      await fetchCustomers();
+    } catch (error: any) {
+      console.error('Error syncing balances:', error);
+      alert('Error en la sincronización: ' + (error.message || 'Error desconocido'));
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handlePayment = async () => {
     if (!DATABASE_ID || !COLLECTION_PAYMENTS_ID || !selectedCustomer) return;
 
@@ -358,6 +398,15 @@ export default function Customers() {
               </div>
               <h3 className="text-xl font-bold text-slate-900">{selectedCustomer.name}</h3>
               <p className="text-sm text-slate-500 mb-1">{selectedCustomer.tier} Member</p>
+
+              <button
+                onClick={handleSyncBalances}
+                className="mt-2 text-[10px] font-bold text-primary hover:underline flex items-center gap-1"
+              >
+                <span className="material-symbols-outlined text-xs">sync</span>
+                Recalcular Totales
+              </button>
+
               <div className="flex gap-2 mt-2">
                 <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider ${selectedCustomer.status === 'Active' ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>
                   {selectedCustomer.status}
