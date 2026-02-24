@@ -113,19 +113,30 @@ export default function Quotes() {
   };
 
   const handleSaveQuote = async () => {
-    if (!DATABASE_ID || !COLLECTION_ID) return;
+    if (!DATABASE_ID || !COLLECTION_ID) {
+      alert('Error: Configuración de Appwrite incompleta (ID de Colección de Cotizaciones faltante)');
+      return;
+    }
 
     // items must be stringified for Appwrite
     const itemsJson = JSON.stringify(formData.items);
-    const total = calculateTotal(formData.items); // Removido el impuesto por solicitud del usuario
+    const subtotal = calculateTotal(formData.items);
+    const total = subtotal; // Sin impuestos en cotizaciones
 
     const quoteData = {
+      customerName: formData.customer || 'Cliente General',
+      customer: formData.customer || 'Cliente General', // Usar ambos por compatibilidad
       taxId: formData.taxId,
       expiry: formData.expiry,
       items: itemsJson,
+      subtotal: subtotal,
+      tax: 0,
+      taxRate: 0,
       total: total,
       status: editingQuoteId ? quotes.find(q => q.id === editingQuoteId)?.status : 'Draft'
     };
+
+    console.log('Quotes - Saving document:', quoteData);
 
     try {
       if (editingQuoteId) {
@@ -138,9 +149,9 @@ export default function Quotes() {
       }
       fetchQuotes();
       setIsModalOpen(false);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving quote:', error);
-      alert('Error al guardar la cotización');
+      alert('Error al guardar la cotización: ' + (error.message || 'Error desconocido'));
     }
   };
 

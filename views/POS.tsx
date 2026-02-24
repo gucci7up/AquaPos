@@ -109,6 +109,7 @@ export default function POS() {
     try {
       const quoteData = {
         customerId: activeCustomer?.$id || activeCustomer?.id || null,
+        customerName: activeCustomer?.name || 'Cliente General',
         items: JSON.stringify(cart.map(item => ({ id: item.id, name: item.name, quantity: item.quantity, price: item.price }))),
         subtotal: subtotal,
         tax: 0,
