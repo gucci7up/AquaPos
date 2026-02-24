@@ -568,7 +568,12 @@ export default function Settings() {
                                 </div>
 
                                 <div className="px-6 py-4 bg-slate-50 flex justify-end">
-                                    <button className="px-6 py-2 bg-primary text-white font-bold rounded-lg shadow-lg shadow-primary/20 hover:brightness-105">
+                                    <button
+                                        onClick={handleSaveProfile}
+                                        disabled={isSaving}
+                                        className="px-6 py-2 bg-primary text-white font-bold rounded-lg shadow-lg shadow-primary/20 hover:brightness-105 flex items-center gap-2 disabled:opacity-60"
+                                    >
+                                        {isSaving && <span className="material-symbols-outlined text-sm animate-spin">sync</span>}
                                         {t('settings.save')}
                                     </button>
                                 </div>
