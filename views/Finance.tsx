@@ -87,7 +87,7 @@ export default function Finance() {
     const totalCOGS = useMemo(() => {
         // Build a cost map from inventory
         const costMap: Record<string, number> = {};
-        inventory.forEach(p => { costMap[p.$id] = p.costPrice || 0; });
+        inventory.forEach(p => { costMap[p.$id] = parseFloat(p.cost) || 0; });
 
         return filteredSales.reduce((total, sale) => {
             let items: any[] = [];
@@ -108,7 +108,7 @@ export default function Finance() {
     const inventoryVal = useMemo(() => {
         return inventory.reduce((acc, p) => {
             const stock = parseInt(p.stock) || 0;
-            const cost = parseFloat(p.costPrice) || 0;
+            const cost = parseFloat(p.cost) || 0;
             const price = parseFloat(p.price) || 0;
             acc.cost += cost * stock;
             acc.retail += price * stock;
@@ -128,7 +128,7 @@ export default function Finance() {
                 .reduce((s, d) => s + (d.total || 0), 0);
 
             const costMap2: Record<string, number> = {};
-            inventory.forEach(p => { costMap2[p.$id] = p.costPrice || 0; });
+            inventory.forEach(p => { costMap2[p.$id] = p.cost || 0; });
             const cogsMonth = sales
                 .filter(s => { const d = new Date(s.date || s.$createdAt); return d.getMonth() === monthIdx && d.getFullYear() === currentYear; })
                 .reduce((tot, sale) => {
@@ -148,7 +148,7 @@ export default function Finance() {
     // ── Product margin table ──────────────────────────────────────────────────
     const productMargins = useMemo(() => {
         return inventory.map(p => {
-            const cost = parseFloat(p.costPrice) || 0;
+            const cost = parseFloat(p.cost) || 0;
             const price = parseFloat(p.price) || 0;
             const margin = price - cost;
             const marginPct = price > 0 ? (margin / price) * 100 : 0;
@@ -386,8 +386,8 @@ export default function Finance() {
                                                 <td className="px-5 py-3 text-right text-sm font-bold text-emerald-600">+${fmt(item.margin)}</td>
                                                 <td className="px-5 py-3 text-right">
                                                     <span className={`inline-block px-2 py-0.5 rounded text-xs font-bold ${item.marginPct > 50 ? 'bg-emerald-100 text-emerald-700' :
-                                                            item.marginPct > 20 ? 'bg-blue-100 text-blue-700' :
-                                                                'bg-amber-100 text-amber-700'
+                                                        item.marginPct > 20 ? 'bg-blue-100 text-blue-700' :
+                                                            'bg-amber-100 text-amber-700'
                                                         }`}>{item.marginPct.toFixed(1)}%</span>
                                                 </td>
                                                 <td className="px-5 py-3 text-right text-sm text-slate-500 font-medium">{item.roi.toFixed(0)}%</td>
