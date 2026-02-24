@@ -41,6 +41,7 @@ export default function POS() {
       }
       try {
         const response = await databases.listDocuments(DATABASE_ID, COLLECTION_INVENTORY_ID);
+        console.log('POS Fetched Products Raw:', response.documents.length);
         const mapped = response.documents.map((doc: any) => ({
           id: doc.$id,
           name: doc.name,
@@ -50,6 +51,7 @@ export default function POS() {
           image: doc.image || 'https://images.unsplash.com/photo-1595341888016-a392ef81b7de?q=80&w=1000&auto=format&fit=crop', // Default placeholder
           lowStock: (doc.stock || 0) <= 5
         }));
+        console.log('POS Mapped Products:', mapped.length);
         setProducts(mapped);
       } catch (error) {
         console.error('Error fetching products for POS:', error);
@@ -120,7 +122,7 @@ export default function POS() {
       const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase());
       return matchesCategory && matchesSearch;
     });
-  }, [activeCategoryKey, searchQuery]);
+  }, [products, activeCategoryKey, searchQuery]);
 
   // Cart Calculations
   const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
