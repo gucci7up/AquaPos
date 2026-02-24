@@ -382,27 +382,35 @@ export default function Dashboard() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {filteredTransactions.map((tx) => (
-                    <TransactionRow
-                      key={tx.id}
-                      id={tx.id}
-                      name={tx.name}
-                      initials={tx.initials}
-                      amount={`$${tx.amount.toFixed(2)}`}
-                      status={t(`common.status.${tx.status}`)}
-                      rawStatus={tx.status}
-                      date={tx.date}
-                      isMenuOpen={activeMenuId === tx.id}
-                      onToggleMenu={() => setActiveMenuId(activeMenuId === tx.id ? null : tx.id)}
-                      labels={{
-                        view: t('dashboard.actions.viewDetails'),
-                        print: t('dashboard.actions.printReceipt'),
-                        email: t('dashboard.actions.sendEmail'),
-                        refund: t('dashboard.actions.refund')
-                      }}
-                      onNavigate={() => navigate('/sales')}
-                    />
-                  ))}
+                  {filteredTransactions.map((tx) => {
+                    const txId = tx.$id || tx.id || '—';
+                    const txName = tx.customerName || tx.name || tx.client || t('dashboard.guestCustomer') || 'Client';
+                    const txInitials = txName.split(' ').map((w: string) => w[0] || '').join('').toUpperCase().slice(0, 2) || 'CL';
+                    const txAmount = Number(tx.total ?? tx.amount ?? 0);
+                    const txStatus = tx.status || 'completed';
+                    const txDate = tx.date || tx.$createdAt || '';
+                    return (
+                      <TransactionRow
+                        key={txId}
+                        id={txId}
+                        name={txName}
+                        initials={txInitials}
+                        amount={`$${txAmount.toFixed(2)}`}
+                        status={t(`common.status.${txStatus}`) || txStatus}
+                        rawStatus={txStatus}
+                        date={txDate}
+                        isMenuOpen={activeMenuId === txId}
+                        onToggleMenu={() => setActiveMenuId(activeMenuId === txId ? null : txId)}
+                        labels={{
+                          view: t('dashboard.actions.viewDetails'),
+                          print: t('dashboard.actions.printReceipt'),
+                          email: t('dashboard.actions.sendEmail'),
+                          refund: t('dashboard.actions.refund')
+                        }}
+                        onNavigate={() => navigate('/sales')}
+                      />
+                    );
+                  })}
                 </tbody>
               </table>
             ) : (
