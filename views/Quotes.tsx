@@ -125,7 +125,6 @@ export default function Quotes() {
 
     const quoteData = {
       customerName: formData.customer || 'Cliente General',
-      customer: formData.customer || 'Cliente General', // Usar ambos por compatibilidad
       taxId: formData.taxId,
       expiry: formData.expiry,
       items: itemsJson,
