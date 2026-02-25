@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { HashRouter, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import { LanguageProvider, useLanguage } from './LanguageContext';
+import { BrandingProvider, useBranding } from './BrandingContext';
 import LandingPage from './views/LandingPage';
 import Dashboard from './views/Dashboard';
 import POS from './views/POS';
@@ -29,8 +30,8 @@ const SidebarLink = ({ to, icon, label, isNew = false, onClick }: { to: string; 
         if (onClick) onClick();
       }}
       className={`flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg cursor-pointer transition-colors mt-1 ${isActive
-          ? 'bg-primary/10 text-primary border border-primary/20'
-          : 'text-slate-600 hover:bg-slate-100'
+        ? 'bg-primary/10 text-primary border border-primary/20'
+        : 'text-slate-600 hover:bg-slate-100'
         }`}
     >
       <span className="material-symbols-outlined">{icon}</span>
@@ -59,6 +60,7 @@ const MobileNavItem = ({ to, icon, label, isActive }: { to: string; icon: string
 
 const Layout = ({ children }: { children?: React.ReactNode }) => {
   const { t } = useLanguage();
+  const { branding } = useBranding();
   const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -72,11 +74,15 @@ const Layout = ({ children }: { children?: React.ReactNode }) => {
       {/* Desktop Sidebar */}
       <aside className="hidden md:flex w-64 flex-shrink-0 bg-white border-r border-slate-200 flex-col z-20">
         <div className="p-6 flex items-center gap-3">
-          <div className="size-10 bg-primary rounded-lg flex items-center justify-center text-white shadow-lg shadow-primary/20">
-            <span className="material-symbols-outlined text-2xl">water_drop</span>
-          </div>
+          {branding.logoUrl ? (
+            <img src={branding.logoUrl} alt="logo" className="h-10 w-10 object-contain rounded-lg" />
+          ) : (
+            <div className="size-10 bg-primary rounded-lg flex items-center justify-center text-white shadow-lg shadow-primary/20">
+              <span className="material-symbols-outlined text-2xl">water_drop</span>
+            </div>
+          )}
           <div>
-            <h1 className="text-xl font-bold tracking-tight text-slate-900 leading-none">AquaPos</h1>
+            <h1 className="text-xl font-bold tracking-tight text-slate-900 leading-none">{branding.businessName || 'AquaPos'}</h1>
             <p className="text-[10px] text-slate-500 font-bold uppercase tracking-[0.1em] mt-1">Enterprise OS</p>
           </div>
         </div>
@@ -176,32 +182,34 @@ const MenuGridItem = ({ to, icon, label, color, onClick }: any) => {
 export default function App() {
   return (
     <LanguageProvider>
-      <HashRouter>
-        <Routes>
-          {/* Landing Page Route - No Layout */}
-          <Route path="/" element={<LandingPage />} />
+      <BrandingProvider>
+        <HashRouter>
+          <Routes>
+            {/* Landing Page Route - No Layout */}
+            <Route path="/" element={<LandingPage />} />
 
-          {/* Auth Route - No Layout */}
-          <Route path="/login" element={<Auth />} />
+            {/* Auth Route - No Layout */}
+            <Route path="/login" element={<Auth />} />
 
-          {/* Public Checkout - No Layout */}
-          <Route path="/checkout/:planSlug" element={<SubscriptionCheckout />} />
+            {/* Public Checkout - No Layout */}
+            <Route path="/checkout/:planSlug" element={<SubscriptionCheckout />} />
 
-          {/* Application Routes - Wrapped in Layout */}
-          <Route path="/dashboard" element={<Layout><Dashboard /></Layout>} />
-          <Route path="/pos" element={<Layout><POS /></Layout>} />
-          <Route path="/inventory" element={<Layout><Inventory /></Layout>} />
-          <Route path="/suppliers" element={<Layout><Suppliers /></Layout>} />
-          <Route path="/sales" element={<Layout><Sales /></Layout>} />
-          <Route path="/quotes" element={<Layout><Quotes /></Layout>} />
-          <Route path="/finance" element={<Layout><Finance /></Layout>} />
-          <Route path="/customers" element={<Layout><Customers /></Layout>} />
-          <Route path="/subscriptions" element={<Layout><Subscriptions /></Layout>} />
-          <Route path="/ai" element={<Layout><AquaAI /></Layout>} />
-          <Route path="/settings" element={<Layout><Settings /></Layout>} />
-          <Route path="/support" element={<Layout><Support /></Layout>} />
-        </Routes>
-      </HashRouter>
+            {/* Application Routes - Wrapped in Layout */}
+            <Route path="/dashboard" element={<Layout><Dashboard /></Layout>} />
+            <Route path="/pos" element={<Layout><POS /></Layout>} />
+            <Route path="/inventory" element={<Layout><Inventory /></Layout>} />
+            <Route path="/suppliers" element={<Layout><Suppliers /></Layout>} />
+            <Route path="/sales" element={<Layout><Sales /></Layout>} />
+            <Route path="/quotes" element={<Layout><Quotes /></Layout>} />
+            <Route path="/finance" element={<Layout><Finance /></Layout>} />
+            <Route path="/customers" element={<Layout><Customers /></Layout>} />
+            <Route path="/subscriptions" element={<Layout><Subscriptions /></Layout>} />
+            <Route path="/ai" element={<Layout><AquaAI /></Layout>} />
+            <Route path="/settings" element={<Layout><Settings /></Layout>} />
+            <Route path="/support" element={<Layout><Support /></Layout>} />
+          </Routes>
+        </HashRouter>
+      </BrandingProvider>
     </LanguageProvider>
   );
 }

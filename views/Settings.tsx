@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useLanguage } from '../LanguageContext';
 import UserMenu from '../UserMenu';
 import { databases, storage, functions, ID, Query } from '@/lib/appwrite';
+import { useBranding } from '../BrandingContext';
 
 const DATABASE_ID = import.meta.env.VITE_APPWRITE_DATABASE_ID;
 const COLLECTION_SETTINGS_ID = import.meta.env.VITE_APPWRITE_COLLECTION_SETTINGS_ID || 'settings';
@@ -35,6 +36,7 @@ const initialPlans = [
 
 export default function Settings() {
     const { t, language, setLanguage, isDark, toggleDark } = useLanguage();
+    const { reloadBranding } = useBranding();
     const [activeTab, setActiveTab] = useState<'general' | 'branding' | 'team' | 'billing' | 'integrations'>('general');
 
     // State: Business Profile
@@ -168,6 +170,8 @@ export default function Settings() {
                 setSettingsDocId(res.$id);
             }
             alert(t('settings.savedSuccess'));
+            reloadBranding(); // propagate changes immediately across the app
+
         } catch (error: any) {
             console.error('Error saving settings:', error);
             alert('Error al guardar configuración: ' + error.message);
