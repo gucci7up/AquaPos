@@ -15,6 +15,14 @@ const FUNCTION_PROCESS_SALE_ID = import.meta.env.VITE_APPWRITE_FUNCTION_PROCESS_
 const mockProductsFallback: any[] = [];
 
 const COLLECTION_CUSTOMERS_ID = import.meta.env.VITE_APPWRITE_COLLECTION_CUSTOMERS_ID || 'customers';
+const BUCKET_ID = import.meta.env.VITE_APPWRITE_BUCKET_IMAGES_ID || 'products';
+const ENDPOINT = import.meta.env.VITE_APPWRITE_ENDPOINT;
+const PROJECT_ID = import.meta.env.VITE_APPWRITE_PROJECT_ID;
+
+const buildLogoUrl = (fileId: string | null | undefined): string | undefined => {
+  if (!fileId || !ENDPOINT || !BUCKET_ID || !PROJECT_ID) return undefined;
+  return `${ENDPOINT}/storage/buckets/${BUCKET_ID}/files/${fileId}/preview?project=${PROJECT_ID}&width=800`;
+};
 
 export default function POS() {
   const { t } = useLanguage();
@@ -82,13 +90,25 @@ export default function POS() {
         Query.limit(1)
       ]);
       if (response.documents.length > 0) {
-        const settings = response.documents[0];
-        console.log('POS Settings Loaded:', settings);
-        setTaxRate(settings.taxRate ?? 18);
-        setBusinessSettings(settings);
+        const s = response.documents[0];
+        console.log('POS Settings Loaded:', s);
+        setTaxRate(s.taxRate ?? 18);
+
+        // Build proper businessSettings object that PrintTemplates understands
+        setBusinessSettings({
+          name: s.businessName || s.name || 'Mi Empresa',
+          address: s.address || '',
+          phone: s.phone || '',
+          email: s.email || '',
+          website: s.website || '',
+          taxId: s.legalId || s.taxId || '',
+          taxRegime: s.taxRegime || '',
+          logo: buildLogoUrl(s.branding_logoUrl),
+        });
+
         // Basic currency symbol logic
-        if (settings.currency?.includes('USD')) setCurrencySymbol('$');
-        else if (settings.currency?.includes('DOP')) setCurrencySymbol('RD$');
+        if (s.currency?.includes('USD')) setCurrencySymbol('$');
+        else if (s.currency?.includes('DOP')) setCurrencySymbol('RD$');
         else setCurrencySymbol('$');
       } else {
         console.log('POS No settings found in collection');
