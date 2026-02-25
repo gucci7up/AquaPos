@@ -171,8 +171,8 @@ export default function Auth() {
                         onClick={() =>
                             account.createOAuth2Session(
                                 'google' as any,
-                                `${window.location.origin}${window.location.pathname}#/dashboard`,
-                                `${window.location.origin}${window.location.pathname}#/login`
+                                `${window.location.origin}/dashboard`,
+                                `${window.location.origin}/login`
                             )
                         }
                         className="w-full flex items-center justify-center gap-3 py-3 border border-slate-200 rounded-xl hover:bg-slate-50 active:scale-95 transition-all font-bold text-slate-700 text-sm shadow-sm"

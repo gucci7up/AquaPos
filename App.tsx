@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { HashRouter, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import { LanguageProvider, useLanguage } from './LanguageContext';
 import { BrandingProvider, useBranding } from './BrandingContext';
 import LandingPage from './views/LandingPage';
@@ -183,7 +183,7 @@ export default function App() {
   return (
     <LanguageProvider>
       <BrandingProvider>
-        <HashRouter>
+        <BrowserRouter>
           <Routes>
             {/* Landing Page Route - No Layout */}
             <Route path="/" element={<LandingPage />} />
@@ -208,7 +208,7 @@ export default function App() {
             <Route path="/settings" element={<Layout><Settings /></Layout>} />
             <Route path="/support" element={<Layout><Support /></Layout>} />
           </Routes>
-        </HashRouter>
+        </BrowserRouter>
       </BrandingProvider>
     </LanguageProvider>
   );
