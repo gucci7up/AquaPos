@@ -17,7 +17,7 @@ const PLANS = [
 ];
 
 const CYCLES = ['Mensual', 'Bimestral', 'Trimestral', 'Anual'];
-const STATUSES = ['Activo', 'Vencido', 'Cancelado', 'Pausado'];
+const STATUSES = ['Activo', 'Pendiente', 'Vencido', 'Cancelado', 'Pausado'];
 
 const safeNum = (v: any) => Number(v) || 0;
 const fmt = (n: number) =>
@@ -206,6 +206,7 @@ export default function Subscriptions() {
     // ── Status styling ─────────────────────────────────────────────────────────
     const statusColor = (s: string) => {
         if (s === 'Activo') return 'bg-emerald-100 text-emerald-700';
+        if (s === 'Pendiente') return 'bg-amber-100 text-amber-700';
         if (s === 'Vencido') return 'bg-red-100 text-red-700';
         if (s === 'Pausado') return 'bg-amber-100 text-amber-700';
         if (s === 'Cancelado') return 'bg-slate-100 text-slate-500';
@@ -290,8 +291,8 @@ export default function Subscriptions() {
                                 key={s}
                                 onClick={() => setFilter(s)}
                                 className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${filterStatus === s
-                                        ? 'bg-slate-800 text-white'
-                                        : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+                                    ? 'bg-slate-800 text-white'
+                                    : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
                                     }`}
                             >
                                 {s}

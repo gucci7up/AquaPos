@@ -15,23 +15,23 @@ import Settings from './views/Settings';
 import Support from './views/Support';
 import Auth from './views/Auth';
 import Subscriptions from './views/Subscriptions';
+import SubscriptionCheckout from './views/SubscriptionCheckout';
 
 const SidebarLink = ({ to, icon, label, isNew = false, onClick }: { to: string; icon: string; label: string; isNew?: boolean; onClick?: () => void }) => {
   const location = useLocation();
   const navigate = useNavigate();
-  const isActive = location.pathname === to; 
+  const isActive = location.pathname === to;
 
   return (
-    <div 
+    <div
       onClick={() => {
         navigate(to);
         if (onClick) onClick();
       }}
-      className={`flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg cursor-pointer transition-colors mt-1 ${
-        isActive 
-          ? 'bg-primary/10 text-primary border border-primary/20' 
+      className={`flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg cursor-pointer transition-colors mt-1 ${isActive
+          ? 'bg-primary/10 text-primary border border-primary/20'
           : 'text-slate-600 hover:bg-slate-100'
-      }`}
+        }`}
     >
       <span className="material-symbols-outlined">{icon}</span>
       <span className="flex-1">{label}</span>
@@ -43,18 +43,18 @@ const SidebarLink = ({ to, icon, label, isNew = false, onClick }: { to: string; 
 };
 
 const MobileNavItem = ({ to, icon, label, isActive }: { to: string; icon: string; label: string; isActive: boolean }) => {
-    const navigate = useNavigate();
-    return (
-        <button 
-            onClick={() => navigate(to)}
-            className={`flex flex-col items-center justify-center w-full py-2 transition-all duration-300 ${isActive ? 'text-primary -translate-y-1' : 'text-slate-400'}`}
-        >
-            <div className={`p-1.5 rounded-xl mb-0.5 transition-all ${isActive ? 'bg-primary/10' : 'bg-transparent'}`}>
-                <span className={`material-symbols-outlined text-2xl ${isActive ? 'fill-1' : ''}`}>{icon}</span>
-            </div>
-            <span className="text-[10px] font-bold">{label}</span>
-        </button>
-    );
+  const navigate = useNavigate();
+  return (
+    <button
+      onClick={() => navigate(to)}
+      className={`flex flex-col items-center justify-center w-full py-2 transition-all duration-300 ${isActive ? 'text-primary -translate-y-1' : 'text-slate-400'}`}
+    >
+      <div className={`p-1.5 rounded-xl mb-0.5 transition-all ${isActive ? 'bg-primary/10' : 'bg-transparent'}`}>
+        <span className={`material-symbols-outlined text-2xl ${isActive ? 'fill-1' : ''}`}>{icon}</span>
+      </div>
+      <span className="text-[10px] font-bold">{label}</span>
+    </button>
+  );
 };
 
 const Layout = ({ children }: { children?: React.ReactNode }) => {
@@ -110,51 +110,51 @@ const Layout = ({ children }: { children?: React.ReactNode }) => {
       {/* Main Content Area */}
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
         <div className="flex-1 overflow-hidden relative">
-            {/* Added padding bottom for mobile nav */}
-            <div className="h-full pb-[80px] md:pb-0 overflow-y-auto bg-background-light"> 
-                {children}
-            </div>
+          {/* Added padding bottom for mobile nav */}
+          <div className="h-full pb-[80px] md:pb-0 overflow-y-auto bg-background-light">
+            {children}
+          </div>
         </div>
 
         {/* Mobile Bottom Navigation (WhatsApp Style / Floating Modern) */}
         <div className="md:hidden fixed bottom-4 left-4 right-4 bg-white/90 backdrop-blur-xl border border-white/50 shadow-2xl rounded-2xl z-50 flex justify-around items-center h-[70px] px-2 ring-1 ring-black/5">
-            <MobileNavItem to="/dashboard" icon="dashboard" label="Home" isActive={location.pathname === '/dashboard'} />
-            <MobileNavItem to="/pos" icon="point_of_sale" label="POS" isActive={location.pathname === '/pos'} />
-            
-            {/* Central Action Button - BRAND COLOR */}
-            <div className="relative -top-6">
-                <button 
-                    onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                    className="size-14 bg-primary rounded-full shadow-xl shadow-primary/30 flex items-center justify-center text-white border-4 border-[#f6f8f8] active:scale-95 transition-transform"
-                >
-                    <span className="material-symbols-outlined text-2xl">{isMobileMenuOpen ? 'close' : 'apps'}</span>
-                </button>
-            </div>
+          <MobileNavItem to="/dashboard" icon="dashboard" label="Home" isActive={location.pathname === '/dashboard'} />
+          <MobileNavItem to="/pos" icon="point_of_sale" label="POS" isActive={location.pathname === '/pos'} />
 
-            <MobileNavItem to="/inventory" icon="inventory_2" label="Stock" isActive={location.pathname === '/inventory'} />
-            <MobileNavItem to="/sales" icon="receipt_long" label="Sales" isActive={location.pathname === '/sales'} />
+          {/* Central Action Button - BRAND COLOR */}
+          <div className="relative -top-6">
+            <button
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              className="size-14 bg-primary rounded-full shadow-xl shadow-primary/30 flex items-center justify-center text-white border-4 border-[#f6f8f8] active:scale-95 transition-transform"
+            >
+              <span className="material-symbols-outlined text-2xl">{isMobileMenuOpen ? 'close' : 'apps'}</span>
+            </button>
+          </div>
+
+          <MobileNavItem to="/inventory" icon="inventory_2" label="Stock" isActive={location.pathname === '/inventory'} />
+          <MobileNavItem to="/sales" icon="receipt_long" label="Sales" isActive={location.pathname === '/sales'} />
         </div>
 
         {/* Mobile Expanded Menu (Drawer) */}
         {isMobileMenuOpen && (
-            <div className="md:hidden fixed inset-0 z-40 bg-slate-900/20 backdrop-blur-sm" onClick={() => setIsMobileMenuOpen(false)}>
-                <div 
-                    className="absolute bottom-[100px] left-4 right-4 bg-white rounded-2xl shadow-2xl p-4 animate-in slide-in-from-bottom-10 fade-in duration-200"
-                    onClick={(e) => e.stopPropagation()}
-                >
-                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 px-2">More Options</p>
-                    <div className="grid grid-cols-4 gap-4">
-                        <MenuGridItem to="/suppliers" icon="local_shipping" label="Suppliers" color="bg-orange-100 text-orange-600" onClick={() => setIsMobileMenuOpen(false)} />
-                        <MenuGridItem to="/finance" icon="account_balance" label="Finance" color="bg-emerald-100 text-emerald-600" onClick={() => setIsMobileMenuOpen(false)} />
-                        <MenuGridItem to="/customers" icon="group" label="Clients" color="bg-blue-100 text-blue-600" onClick={() => setIsMobileMenuOpen(false)} />
-                        <MenuGridItem to="/ai" icon="auto_awesome" label="AquaAI" color="bg-primary/20 text-primary" onClick={() => setIsMobileMenuOpen(false)} />
-                        <MenuGridItem to="/quotes" icon="request_quote" label="Quotes" color="bg-purple-100 text-purple-600" onClick={() => setIsMobileMenuOpen(false)} />
-                        <MenuGridItem to="/subscriptions" icon="loyalty" label="Subs" color="bg-pink-100 text-pink-600" onClick={() => setIsMobileMenuOpen(false)} />
-                        <MenuGridItem to="/settings" icon="settings" label="Settings" color="bg-slate-100 text-slate-600" onClick={() => setIsMobileMenuOpen(false)} />
-                        <MenuGridItem to="/support" icon="help" label="Support" color="bg-amber-100 text-amber-600" onClick={() => setIsMobileMenuOpen(false)} />
-                    </div>
-                </div>
+          <div className="md:hidden fixed inset-0 z-40 bg-slate-900/20 backdrop-blur-sm" onClick={() => setIsMobileMenuOpen(false)}>
+            <div
+              className="absolute bottom-[100px] left-4 right-4 bg-white rounded-2xl shadow-2xl p-4 animate-in slide-in-from-bottom-10 fade-in duration-200"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 px-2">More Options</p>
+              <div className="grid grid-cols-4 gap-4">
+                <MenuGridItem to="/suppliers" icon="local_shipping" label="Suppliers" color="bg-orange-100 text-orange-600" onClick={() => setIsMobileMenuOpen(false)} />
+                <MenuGridItem to="/finance" icon="account_balance" label="Finance" color="bg-emerald-100 text-emerald-600" onClick={() => setIsMobileMenuOpen(false)} />
+                <MenuGridItem to="/customers" icon="group" label="Clients" color="bg-blue-100 text-blue-600" onClick={() => setIsMobileMenuOpen(false)} />
+                <MenuGridItem to="/ai" icon="auto_awesome" label="AquaAI" color="bg-primary/20 text-primary" onClick={() => setIsMobileMenuOpen(false)} />
+                <MenuGridItem to="/quotes" icon="request_quote" label="Quotes" color="bg-purple-100 text-purple-600" onClick={() => setIsMobileMenuOpen(false)} />
+                <MenuGridItem to="/subscriptions" icon="loyalty" label="Subs" color="bg-pink-100 text-pink-600" onClick={() => setIsMobileMenuOpen(false)} />
+                <MenuGridItem to="/settings" icon="settings" label="Settings" color="bg-slate-100 text-slate-600" onClick={() => setIsMobileMenuOpen(false)} />
+                <MenuGridItem to="/support" icon="help" label="Support" color="bg-amber-100 text-amber-600" onClick={() => setIsMobileMenuOpen(false)} />
+              </div>
             </div>
+          </div>
         )}
       </main>
     </div>
@@ -162,43 +162,46 @@ const Layout = ({ children }: { children?: React.ReactNode }) => {
 };
 
 const MenuGridItem = ({ to, icon, label, color, onClick }: any) => {
-    const navigate = useNavigate();
-    return (
-        <button onClick={() => { navigate(to); onClick(); }} className="flex flex-col items-center gap-2 p-2 rounded-xl hover:bg-slate-50 transition-colors">
-            <div className={`size-12 rounded-xl flex items-center justify-center ${color}`}>
-                <span className="material-symbols-outlined text-2xl">{icon}</span>
-            </div>
-            <span className="text-xs font-medium text-slate-700">{label}</span>
-        </button>
-    );
+  const navigate = useNavigate();
+  return (
+    <button onClick={() => { navigate(to); onClick(); }} className="flex flex-col items-center gap-2 p-2 rounded-xl hover:bg-slate-50 transition-colors">
+      <div className={`size-12 rounded-xl flex items-center justify-center ${color}`}>
+        <span className="material-symbols-outlined text-2xl">{icon}</span>
+      </div>
+      <span className="text-xs font-medium text-slate-700">{label}</span>
+    </button>
+  );
 }
 
 export default function App() {
   return (
     <LanguageProvider>
-        <HashRouter>
-            <Routes>
-                {/* Landing Page Route - No Layout */}
-                <Route path="/" element={<LandingPage />} />
-                
-                {/* Auth Route - No Layout */}
-                <Route path="/login" element={<Auth />} />
+      <HashRouter>
+        <Routes>
+          {/* Landing Page Route - No Layout */}
+          <Route path="/" element={<LandingPage />} />
 
-                {/* Application Routes - Wrapped in Layout */}
-                <Route path="/dashboard" element={<Layout><Dashboard /></Layout>} />
-                <Route path="/pos" element={<Layout><POS /></Layout>} />
-                <Route path="/inventory" element={<Layout><Inventory /></Layout>} />
-                <Route path="/suppliers" element={<Layout><Suppliers /></Layout>} />
-                <Route path="/sales" element={<Layout><Sales /></Layout>} />
-                <Route path="/quotes" element={<Layout><Quotes /></Layout>} />
-                <Route path="/finance" element={<Layout><Finance /></Layout>} />
-                <Route path="/customers" element={<Layout><Customers /></Layout>} />
-                <Route path="/subscriptions" element={<Layout><Subscriptions /></Layout>} />
-                <Route path="/ai" element={<Layout><AquaAI /></Layout>} />
-                <Route path="/settings" element={<Layout><Settings /></Layout>} />
-                <Route path="/support" element={<Layout><Support /></Layout>} />
-            </Routes>
-        </HashRouter>
+          {/* Auth Route - No Layout */}
+          <Route path="/login" element={<Auth />} />
+
+          {/* Public Checkout - No Layout */}
+          <Route path="/checkout/:planSlug" element={<SubscriptionCheckout />} />
+
+          {/* Application Routes - Wrapped in Layout */}
+          <Route path="/dashboard" element={<Layout><Dashboard /></Layout>} />
+          <Route path="/pos" element={<Layout><POS /></Layout>} />
+          <Route path="/inventory" element={<Layout><Inventory /></Layout>} />
+          <Route path="/suppliers" element={<Layout><Suppliers /></Layout>} />
+          <Route path="/sales" element={<Layout><Sales /></Layout>} />
+          <Route path="/quotes" element={<Layout><Quotes /></Layout>} />
+          <Route path="/finance" element={<Layout><Finance /></Layout>} />
+          <Route path="/customers" element={<Layout><Customers /></Layout>} />
+          <Route path="/subscriptions" element={<Layout><Subscriptions /></Layout>} />
+          <Route path="/ai" element={<Layout><AquaAI /></Layout>} />
+          <Route path="/settings" element={<Layout><Settings /></Layout>} />
+          <Route path="/support" element={<Layout><Support /></Layout>} />
+        </Routes>
+      </HashRouter>
     </LanguageProvider>
   );
 }
