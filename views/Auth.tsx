@@ -163,19 +163,23 @@ export default function Auth() {
                         <div className="absolute inset-0 flex items-center">
                             <div className="w-full border-t border-slate-200"></div>
                         </div>
-                        <span className="relative bg-white px-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">{t('auth.or')}</span>
+                        <span className="relative bg-white px-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">O continúa con</span>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                        <button className="flex items-center justify-center gap-2 py-3 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors">
-                            <img src="https://www.svgrepo.com/show/475656/google-color.svg" className="w-5 h-5" alt="Google" />
-                            <span className="text-sm font-bold text-slate-700">Google</span>
-                        </button>
-                        <button className="flex items-center justify-center gap-2 py-3 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors">
-                            <img src="https://www.svgrepo.com/show/448234/microsoft.svg" className="w-5 h-5" alt="Microsoft" />
-                            <span className="text-sm font-bold text-slate-700">Microsoft</span>
-                        </button>
-                    </div>
+                    <button
+                        type="button"
+                        onClick={() =>
+                            account.createOAuth2Session(
+                                'google' as any,
+                                `${window.location.origin}${window.location.pathname}#/dashboard`,
+                                `${window.location.origin}${window.location.pathname}#/login`
+                            )
+                        }
+                        className="w-full flex items-center justify-center gap-3 py-3 border border-slate-200 rounded-xl hover:bg-slate-50 active:scale-95 transition-all font-bold text-slate-700 text-sm shadow-sm"
+                    >
+                        <img src="https://www.svgrepo.com/show/475656/google-color.svg" className="w-5 h-5" alt="Google" />
+                        Continuar con Google
+                    </button>
 
                     <p className="mt-8 text-center text-sm text-slate-500">
                         {mode === 'login' ? t('auth.noAccount') : t('auth.hasAccount')}
