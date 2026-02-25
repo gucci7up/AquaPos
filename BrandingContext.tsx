@@ -26,6 +26,9 @@ export interface BrandingConfig {
     taxRegime: string;
     currency: string;
     taxRate: number;
+    loginBg: string; // background image for Auth login page
+    landingHero: string; // hero image for landing page
+    landingFeature: string; // feature image for landing page
 }
 
 interface BrandingContextValue {
@@ -46,6 +49,9 @@ const defaults: BrandingConfig = {
     taxRegime: '',
     currency: 'USD',
     taxRate: 0,
+    loginBg: '',
+    landingHero: '',
+    landingFeature: '',
 };
 
 // ── Context ───────────────────────────────────────────────────────────────────
@@ -77,6 +83,9 @@ export const BrandingProvider: React.FC<{ children: React.ReactNode }> = ({ chil
                 taxRegime: d.taxRegime || '',
                 currency: d.currency || 'USD',
                 taxRate: Number(d.taxRate) || 0,
+                loginBg: buildFileUrl(d.branding_loginBg),
+                landingHero: buildFileUrl(d.branding_landingHero),
+                landingFeature: buildFileUrl(d.branding_landingFeature),
             };
 
             setBranding(config);

@@ -2,9 +2,11 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../LanguageContext';
 import { account, ID } from '@/lib/appwrite';
+import { useBranding } from '../BrandingContext';
 
 export default function Auth() {
     const { t, language, setLanguage } = useLanguage();
+    const { branding } = useBranding();
     const navigate = useNavigate();
     const [mode, setMode] = useState<'login' | 'register'>('login');
     const [loading, setLoading] = useState(false);
@@ -39,19 +41,23 @@ export default function Auth() {
 
     return (
         <div className="min-h-screen flex bg-white">
-            {/* Left Side - Hero / Fashion Image */}
+            {/* Left Side - Branding Image */}
             <div className="hidden lg:block w-1/2 relative overflow-hidden">
                 <img
-                    src="https://images.unsplash.com/photo-1441986300917-64674bd600d8?q=80&w=2070&auto=format&fit=crop"
-                    alt="Fashion Store"
+                    src={branding.loginBg || 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?q=80&w=2070&auto=format&fit=crop'}
+                    alt="Login Background"
                     className="w-full h-full object-cover"
                 />
                 <div className="absolute inset-0 bg-slate-900/60 flex flex-col justify-end p-16 text-white">
                     <div className="flex items-center gap-3 mb-6">
-                        <div className="size-10 bg-[#13daec] rounded-lg flex items-center justify-center text-white shadow-lg shadow-[#13daec]/20">
-                            <span className="material-symbols-outlined text-2xl font-bold">water_drop</span>
-                        </div>
-                        <span className="text-3xl font-extrabold tracking-tight">AquaPos</span>
+                        {branding.logoUrl ? (
+                            <img src={branding.logoUrl} alt="logo" className="h-10 w-10 object-contain rounded-lg" />
+                        ) : (
+                            <div className="size-10 bg-[#13daec] rounded-lg flex items-center justify-center text-white shadow-lg shadow-[#13daec]/20">
+                                <span className="material-symbols-outlined text-2xl font-bold">water_drop</span>
+                            </div>
+                        )}
+                        <span className="text-3xl font-extrabold tracking-tight">{branding.businessName || 'AquaPos'}</span>
                     </div>
                     <h1 className="text-5xl font-extrabold leading-tight mb-4">
                         Manage your <br /> <span className="text-[#13daec]">Style Empire.</span>

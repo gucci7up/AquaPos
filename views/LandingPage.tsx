@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../LanguageContext';
+import { useBranding } from '../BrandingContext';
 
 export default function LandingPage() {
   const { t, setLanguage, language } = useLanguage();
+  const { branding } = useBranding();
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -47,10 +49,14 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-20 items-center">
             <div className="flex items-center gap-2 cursor-pointer" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
-              <div className="size-10 bg-primary rounded-lg flex items-center justify-center text-white shadow-lg shadow-primary/20" style={{ backgroundColor: colors.primary }}>
-                <span className="material-symbols-outlined text-2xl font-bold">water_drop</span>
-              </div>
-              <span className="text-2xl font-extrabold tracking-tight" style={{ color: colors.slate950 }}>AquaPos</span>
+              {branding.logoUrl ? (
+                <img src={branding.logoUrl} alt="logo" className="h-10 w-10 object-contain rounded-lg" />
+              ) : (
+                <div className="size-10 bg-primary rounded-lg flex items-center justify-center text-white shadow-lg shadow-primary/20" style={{ backgroundColor: colors.primary }}>
+                  <span className="material-symbols-outlined text-2xl font-bold">water_drop</span>
+                </div>
+              )}
+              <span className="text-2xl font-extrabold tracking-tight" style={{ color: colors.slate950 }}>{branding.businessName || 'AquaPos'}</span>
             </div>
 
             {/* Desktop Nav */}
@@ -139,9 +145,9 @@ export default function LandingPage() {
                 {/* Dashboard Image */}
                 <div className="rounded-2xl shadow-2xl border border-slate-200 w-full aspect-[4/3] bg-white overflow-hidden relative group">
                   <img
-                    src="https://lh3.googleusercontent.com/aida-public/AB6AXuA7lYcDqoIsNqzIvtzR5LqLXZ4JlKkCRqIagznKEbsvnI6pQ0x3chrwmsp2U2cowE7Ll7tO1aysWfCu6OAs8JWAmc3l7dTPPSPlpAo47gaVg6U8y2iE797oWUBO7ciQyHbV12LoYTMIPIG8GMEZd9lTyZvzWK_ruTQvnXT0-mnS1ALu5_BS9IBUSudsfL_KcDvFjHWumWoiUFxNRQHnf0DoZ7rRh823k53HIdQDHsKEFehywkn_mMIGNhvfoyrX86Qwx8nLDCcVw3s"
+                    src={branding.landingHero || 'https://lh3.googleusercontent.com/aida-public/AB6AXuA7lYcDqoIsNqzIvtzR5LqLXZ4JlKkCRqIagznKEbsvnI6pQ0x3chrwmsp2U2cowE7Ll7tO1aysWfCu6OAs8JWAmc3l7dTPPSPlpAo47gaVg6U8y2iE797oWUBO7ciQyHbV12LoYTMIPIG8GMEZd9lTyZvzWK_ruTQvnXT0-mnS1ALu5_BS9IBUSudsfL_KcDvFjHWumWoiUFxNRQHnf0DoZ7rRh823k53HIdQDHsKEFehywkn_mMIGNhvfoyrX86Qwx8nLDCcVw3s'}
                     className="w-full h-full object-cover object-top"
-                    alt="Dashboard"
+                    alt="Dashboard Preview"
                   />
                 </div>
               </div>
@@ -439,8 +445,8 @@ const PricingCard = ({ title, price, period, subText, btnText, features, popular
     <button
       onClick={onSelect || onContact}
       className={`w-full py-3 rounded-xl font-bold transition-all ${isPrimary
-          ? 'bg-primary text-white hover:brightness-105 shadow-lg shadow-primary/20'
-          : 'border border-slate-200 text-slate-900 hover:bg-slate-50'
+        ? 'bg-primary text-white hover:brightness-105 shadow-lg shadow-primary/20'
+        : 'border border-slate-200 text-slate-900 hover:bg-slate-50'
         }`} style={isPrimary ? { backgroundColor: primaryColor } : {}}>
       {btnText}
     </button>
