@@ -22,7 +22,9 @@ export const PrintTemplates: React.FC<PrintDocumentProps> = ({ type, data, busin
         new Intl.NumberFormat('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(val || 0);
 
     const fmtDate = (d?: string) => {
-        const date = d ? new Date(d) : new Date();
+        if (!d) return new Date().toLocaleDateString('es-DO');
+        const date = new Date(d);
+        if (isNaN(date.getTime())) return '—';
         return date.toLocaleDateString('es-DO', { day: '2-digit', month: '2-digit', year: 'numeric' }) +
             ' ' + date.toLocaleTimeString('es-DO', { hour: '2-digit', minute: '2-digit' });
     };
@@ -188,9 +190,6 @@ export const PrintTemplates: React.FC<PrintDocumentProps> = ({ type, data, busin
                 <div style={{ ...S.center, fontSize: '8px', lineHeight: '1.5' }}>
                     <p style={{ margin: '2px 0' }}>
                         Todos nuestros productos cuentan con garantía de un mes a partir de la fecha de su facturación.
-                    </p>
-                    <p style={{ margin: '2px 0' }}>
-                        Favor consignar a la cuenta de ahorros del Banco Ejemplar N°1234567890
                     </p>
                     <p style={{ margin: '4px 0 2px', fontWeight: 'bold' }}>¡Gracias por su compra! 🙂</p>
                     {docNum && <p style={{ margin: '2px 0' }}>Factura N°: {docNum}</p>}
