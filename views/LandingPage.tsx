@@ -151,12 +151,12 @@ export default function LandingPage() {
                   />
                 </div>
               </div>
-              {/* Floating Mobile App Element */}
+              {/* Floating Feature / Mobile App Image */}
               <div className="absolute -bottom-10 -left-10 z-20 w-48 hidden md:block">
                 <img
-                  alt="Mobile App"
+                  alt="Feature"
                   className="rounded-[2rem] shadow-2xl border-4 border-white w-full aspect-[1/2] object-cover"
-                  src="https://lh3.googleusercontent.com/aida-public/AB6AXuBWvk9CAUtPBscww0R9xdnm16iCqTl3vQGzRcMDKb3AkQXIrubU3SwcHYdhUU41WiP2xhBPSZ3eTSeBHgAmArSU4b3y3-SBg3LgvQWtyr1YiUuMxCOXU4oAUQ5xgFWsHahkNg0berzKsxAomp43EQs9flRJVbHnlYxhEfKQNvTI4VU7J8dg5rEiY5qewE8Sw7PWbzcP2PO8Ds0LPhwuthyMeF-wdGACHbd5ZmTdiRlNLV42wfTy31U0QxmBqpdcsVYtVdvda09XJx8"
+                  src={branding.landingFeature || 'https://lh3.googleusercontent.com/aida-public/AB6AXuBWvk9CAUtPBscww0R9xdnm16iCqTl3vQGzRcMDKb3AkQXIrubU3SwcHYdhUU41WiP2xhBPSZ3eTSeBHgAmArSU4b3y3-SBg3LgvQWtyr1YiUuMxCOXU4oAUQ5xgFWsHahkNg0berzKsxAomp43EQs9flRJVbHnlYxhEfKQNvTI4VU7J8dg5rEiY5qewE8Sw7PWbzcP2PO8Ds0LPhwuthyMeF-wdGACHbd5ZmTdiRlNLV42wfTy31U0QxmBqpdcsVYtVdvda09XJx8'}
                 />
               </div>
               <div className="absolute -top-20 -right-20 size-64 bg-primary/10 rounded-full blur-3xl" style={{ backgroundColor: 'rgba(19,218,236,0.1)' }}></div>
