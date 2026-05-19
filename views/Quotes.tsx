@@ -1,12 +1,16 @@
 import React, { useState, useMemo } from 'react';
 import { useLanguage } from '../LanguageContext';
 import UserMenu from '../UserMenu';
-import { databases, Query, ID } from '@/lib/appwrite';
+import { databases, functions, Query, ID } from '@/lib/appwrite';
 import { PrintTemplates } from '../components/PrintTemplates';
 
 const DATABASE_ID = import.meta.env.VITE_APPWRITE_DATABASE_ID;
 const COLLECTION_ID = import.meta.env.VITE_APPWRITE_COLLECTION_QUOTES_ID || 'quotes';
 const COLLECTION_SETTINGS_ID = import.meta.env.VITE_APPWRITE_COLLECTION_SETTINGS_ID || 'settings';
+const FUNCTION_QUOTE_APPROVAL_ID = import.meta.env.VITE_APPWRITE_FUNCTION_QUOTE_APPROVAL_ID;
+const ENDPOINT = import.meta.env.VITE_APPWRITE_ENDPOINT;
+const PROJECT_ID = import.meta.env.VITE_APPWRITE_PROJECT_ID;
+const BUCKET_ID = import.meta.env.VITE_APPWRITE_BUCKET_IMAGES_ID || 'products';
 
 // Mock Data removed
 const initialQuotes: any[] = [];
@@ -16,6 +20,8 @@ export default function Quotes() {
   const [quotes, setQuotes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [businessSettings, setBusinessSettings] = useState<any>(null);
+  const [workingQuoteId, setWorkingQuoteId] = useState<string | null>(null);
+  const [verifyQuote, setVerifyQuote] = useState<any | null>(null);
 
   // Printing state
   const [activeQuoteForPrint, setActiveQuoteForPrint] = useState<any>(null);
@@ -177,6 +183,61 @@ export default function Quotes() {
     }
   };
 
+  const handleGenerateApprovalLink = async (id: string) => {
+    if (!FUNCTION_QUOTE_APPROVAL_ID) {
+      alert('Función de aprobación no configurada.');
+      return;
+    }
+    setWorkingQuoteId(id);
+    try {
+      const execution = await functions.createExecution(
+        FUNCTION_QUOTE_APPROVAL_ID,
+        JSON.stringify({ action: 'createLink', quoteId: id })
+      );
+      const response = JSON.parse(execution.responseBody || '{}');
+      if (!response.success) throw new Error(response.error || 'No se pudo generar el link.');
+      const link = `${window.location.origin}/quote/${id}/approve?token=${response.token}`;
+      await navigator.clipboard.writeText(link);
+      alert('Link copiado al portapapeles:\n\n' + link);
+      fetchQuotes();
+    } catch (e: any) {
+      alert('Error: ' + (e?.message || 'No se pudo generar el link.'));
+    } finally {
+      setWorkingQuoteId(null);
+    }
+  };
+
+  const buildFilePreviewUrl = (fileId: string, width = 800) => {
+    if (!ENDPOINT || !PROJECT_ID || !BUCKET_ID) return '';
+    return `${ENDPOINT}/storage/buckets/${BUCKET_ID}/files/${fileId}/preview?project=${PROJECT_ID}&width=${width}`;
+  };
+
+  const buildFileViewUrl = (fileId: string) => {
+    if (!ENDPOINT || !PROJECT_ID || !BUCKET_ID) return '';
+    return `${ENDPOINT}/storage/buckets/${BUCKET_ID}/files/${fileId}/view?project=${PROJECT_ID}`;
+  };
+
+  const openVerify = (quote: any) => {
+    setVerifyQuote(quote);
+  };
+
+  const handleSetVerification = async (quoteId: string, verified: boolean) => {
+    if (!DATABASE_ID || !COLLECTION_ID) return;
+    setWorkingQuoteId(quoteId);
+    try {
+      await databases.updateDocument(DATABASE_ID, COLLECTION_ID, quoteId, {
+        approvalStatus: verified ? 'Verified' : 'Rejected',
+        status: verified ? 'Approved' : 'Rejected'
+      });
+      setVerifyQuote(null);
+      fetchQuotes();
+    } catch (e: any) {
+      alert('Error: ' + (e?.message || 'No se pudo actualizar la verificación.'));
+    } finally {
+      setWorkingQuoteId(null);
+    }
+  };
+
   const handlePrint = (quote: any) => {
     setActiveQuoteForPrint({
       ...quote,
@@ -275,7 +336,7 @@ export default function Quotes() {
                 {t('quotes.filter')}: {filterStatus}
               </button>
               <div className="absolute top-full right-0 mt-2 w-48 bg-white rounded-xl shadow-xl border border-slate-100 hidden group-hover:block z-20 p-1">
-                {['All', 'Draft', 'Sent', 'Expired', 'Converted'].map(status => (
+                {['All', 'Draft', 'Sent', 'InReview', 'Approved', 'Rejected', 'Expired', 'Converted'].map(status => (
                   <button
                     key={status}
                     onClick={() => setFilterStatus(status)}
@@ -328,12 +389,16 @@ export default function Quotes() {
                       taxId={quote.taxId}
                       amount={`$${totalAmt.toFixed(2)}`}
                       status={quote.status}
+                      approvalStatus={quote.approvalStatus}
                       expiry={new Date(quote.expiry).toLocaleDateString()}
                       onEdit={() => handleOpenModal(quote)}
                       onDelete={() => handleDelete(quote.id)}
                       onConvert={() => handleStatusChange(quote.id, 'Converted')}
                       onRenew={() => handleStatusChange(quote.id, 'Sent')}
                       onPrint={() => handlePrint(quote)}
+                      onLink={() => handleGenerateApprovalLink(quote.id)}
+                      onReview={() => openVerify(quote)}
+                      isWorking={workingQuoteId === quote.id}
                     />
                   );
                 })}
@@ -361,6 +426,92 @@ export default function Quotes() {
           )}
         </div>
       </div>
+
+      {verifyQuote && (
+        <div className="absolute inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-3xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+              <div>
+                <h3 className="text-xl font-black text-slate-900">Verificación de aprobación</h3>
+                <p className="text-xs text-slate-500">Cotización: {verifyQuote.id}</p>
+              </div>
+              <button onClick={() => setVerifyQuote(null)} className="text-slate-400 hover:text-slate-600">
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
+                  <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Nombre</p>
+                  <p className="text-sm font-bold text-slate-900">{verifyQuote.approvalName || '—'}</p>
+                  <p className="text-xs text-slate-500 mt-2">Estado: {verifyQuote.approvalStatus || '—'}</p>
+                  <p className="text-xs text-slate-500">Fecha: {verifyQuote.approvalAt ? new Date(verifyQuote.approvalAt).toLocaleString() : '—'}</p>
+                </div>
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
+                  <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Acciones</p>
+                  <div className="flex flex-col gap-2 mt-3">
+                    <button
+                      onClick={() => handleSetVerification(verifyQuote.id, true)}
+                      disabled={workingQuoteId === verifyQuote.id}
+                      className="px-4 py-2 rounded-xl bg-emerald-600 text-white font-bold disabled:opacity-60"
+                    >
+                      Aprobar
+                    </button>
+                    <button
+                      onClick={() => handleSetVerification(verifyQuote.id, false)}
+                      disabled={workingQuoteId === verifyQuote.id}
+                      className="px-4 py-2 rounded-xl bg-red-600 text-white font-bold disabled:opacity-60"
+                    >
+                      Rechazar
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="border border-slate-200 rounded-2xl overflow-hidden">
+                  <div className="p-4 border-b border-slate-200 bg-slate-50">
+                    <p className="text-sm font-bold text-slate-900">Firma digital</p>
+                  </div>
+                  <div className="p-4">
+                    {verifyQuote.signatureFileId ? (
+                      <img
+                        src={buildFilePreviewUrl(verifyQuote.signatureFileId, 900)}
+                        alt="Firma"
+                        className="w-full rounded-xl border border-slate-200"
+                      />
+                    ) : (
+                      <p className="text-sm text-slate-500">No hay firma cargada.</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="border border-slate-200 rounded-2xl overflow-hidden">
+                  <div className="p-4 border-b border-slate-200 bg-slate-50">
+                    <p className="text-sm font-bold text-slate-900">Documento de identidad</p>
+                  </div>
+                  <div className="p-4">
+                    {verifyQuote.idDocFileId ? (
+                      <a
+                        href={buildFileViewUrl(verifyQuote.idDocFileId)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-200 font-bold text-slate-700 hover:bg-slate-50"
+                      >
+                        <span className="material-symbols-outlined">visibility</span>
+                        Ver documento
+                      </a>
+                    ) : (
+                      <p className="text-sm text-slate-500">No hay documento cargado.</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Create/Edit Modal */}
       {isModalOpen && (
@@ -524,12 +675,15 @@ const StatusCard = ({ title, count, icon, color }: any) => {
   );
 };
 
-const QuoteRow = ({ id, created, customer, taxId, amount, status, expiry, onEdit, onDelete, onConvert, onRenew, onPrint }: any) => {
+const QuoteRow = ({ id, created, customer, taxId, amount, status, approvalStatus, expiry, onEdit, onDelete, onConvert, onRenew, onPrint, onLink, onReview, isWorking }: any) => {
   const statusBadges: any = {
     Sent: 'bg-blue-50 text-blue-600',
     Draft: 'bg-slate-100 text-slate-600',
     Expired: 'bg-red-50 text-red-600',
-    Converted: 'bg-emerald-50 text-emerald-600'
+    Converted: 'bg-emerald-50 text-emerald-600',
+    InReview: 'bg-amber-50 text-amber-700',
+    Approved: 'bg-emerald-50 text-emerald-700',
+    Rejected: 'bg-red-50 text-red-700'
   };
 
   return (
@@ -552,6 +706,14 @@ const QuoteRow = ({ id, created, customer, taxId, amount, status, expiry, onEdit
         <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold ${statusBadges[status]}`}>
           <span className={`size-1.5 rounded-full bg-current`}></span> {status}
         </span>
+        {approvalStatus === 'PendingVerification' && (
+          <div className="mt-2">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black bg-amber-100 text-amber-700 uppercase tracking-wider">
+              <span className="size-1.5 rounded-full bg-amber-600"></span>
+              Pendiente verificación
+            </span>
+          </div>
+        )}
       </td>
       <td className={`px-6 py-4 text-sm ${status === 'Expired' ? 'text-red-400 font-medium' : 'text-slate-500'}`}>{expiry}</td>
       <td className="px-6 py-4 text-right">
@@ -559,6 +721,24 @@ const QuoteRow = ({ id, created, customer, taxId, amount, status, expiry, onEdit
           {status === 'Sent' && <button onClick={onConvert} className="px-3 py-1.5 bg-primary text-white text-xs font-bold rounded-lg hover:brightness-105 transition-all shadow-sm">Convert</button>}
           {status === 'Draft' && <button onClick={() => onRenew()} className="px-3 py-1.5 border border-primary text-primary text-xs font-bold rounded-lg hover:bg-primary/5">Send</button>}
           {status === 'Expired' && <button onClick={onRenew} className="px-3 py-1.5 border border-slate-200 text-slate-500 text-xs font-bold rounded-lg hover:bg-slate-50">Renew</button>}
+          <button
+            onClick={onLink}
+            disabled={isWorking}
+            className="p-1.5 text-slate-400 hover:text-slate-700 disabled:opacity-50"
+            title="Generar link de firma"
+          >
+            <span className="material-symbols-outlined text-lg">link</span>
+          </button>
+          {(approvalStatus === 'PendingVerification' || status === 'InReview') && (
+            <button
+              onClick={onReview}
+              disabled={isWorking}
+              className="p-1.5 text-slate-400 hover:text-amber-600 disabled:opacity-50"
+              title="Revisar aprobación"
+            >
+              <span className="material-symbols-outlined text-lg">fact_check</span>
+            </button>
+          )}
           <button onClick={onPrint} className="p-1.5 text-slate-400 hover:text-primary" title="Print PDF">
             <span className="material-symbols-outlined text-lg">picture_as_pdf</span>
           </button>

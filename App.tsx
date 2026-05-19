@@ -14,6 +14,7 @@ import AquaAI from './views/AquaAI';
 import Settings from './views/Settings';
 import Support from './views/Support';
 import Auth from './views/Auth';
+import QuoteApproval from './views/QuoteApproval';
 
 const SidebarLink = ({ to, icon, label, isNew = false, onClick }: { to: string; icon: string; label: string; isNew?: boolean; onClick?: () => void }) => {
   const location = useLocation();
@@ -184,6 +185,7 @@ export default function App() {
 
             {/* Auth Route - No Layout */}
             <Route path="/login" element={<Auth />} />
+            <Route path="/quote/:quoteId/approve" element={<QuoteApproval />} />
 
             {/* Application Routes - Wrapped in Layout */}
             <Route path="/dashboard" element={<Layout><Dashboard /></Layout>} />
