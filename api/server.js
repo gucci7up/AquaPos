@@ -65,6 +65,7 @@ async function ensureSchema() {
   await ensureColumn('quote_approvals', 'id_doc_filename', 'VARCHAR(255) NULL');
   await ensureColumn('quote_approvals', 'short_code', 'VARCHAR(32) NULL');
   await ensureUniqueIndex('quote_approvals', 'uq_quote_approvals_short_code', 'short_code');
+  await ensureColumn('quotes', 'business_id', 'VARCHAR(64) NULL');
 }
 
 function parseDataUrl(input) {
@@ -82,6 +83,11 @@ const app = express();
 app.use(cors({ origin: CORS_ORIGIN === '*' ? true : CORS_ORIGIN, credentials: true }));
 app.use(express.json({ limit: '35mb' }));
 
+function getBusinessId(req) {
+  const v = String(req.header('x-business-id') || '').trim();
+  return v || null;
+}
+
 app.get('/health', async (_req, res) => {
   try {
     const [rows] = await pool.query('SELECT 1 as ok');
@@ -91,30 +97,54 @@ app.get('/health', async (_req, res) => {
   }
 });
 
-app.get('/api/quotes', async (_req, res) => {
+app.get('/api/quotes', async (req, res) => {
+  const businessId = getBusinessId(req);
+  if (!businessId) {
+    res.status(400).json({ success: false, error: 'Missing x-business-id' });
+    return;
+  }
   try {
-    const [rows] = await pool.query(
-      `SELECT
-        q.id, q.customer_name, q.tax_id, q.expiry_date, q.subtotal, q.total, q.status,
-        qa.status as approval_status, qa.approver_name, qa.approved_at, qa.signature_path, qa.id_doc_path
-       FROM quotes q
-       LEFT JOIN quote_approvals qa ON qa.quote_id = q.id
-       ORDER BY q.created_at DESC
-       LIMIT 200`
-    );
-    res.json({ success: true, quotes: rows });
+    const conn = await pool.getConnection();
+    try {
+      await conn.beginTransaction();
+      await conn.query(`UPDATE quotes SET business_id = ? WHERE business_id IS NULL`, [businessId]);
+      const [rows] = await conn.query(
+        `SELECT
+          q.id, q.customer_name, q.tax_id, q.expiry_date, q.subtotal, q.total, q.status,
+          qa.status as approval_status, qa.approver_name, qa.approved_at, qa.signature_path, qa.id_doc_path
+         FROM quotes q
+         LEFT JOIN quote_approvals qa ON qa.quote_id = q.id
+         WHERE q.business_id = ?
+         ORDER BY q.created_at DESC
+         LIMIT 200`,
+        [businessId]
+      );
+      await conn.commit();
+      res.json({ success: true, quotes: rows });
+    } catch (e) {
+      await conn.rollback();
+      throw e;
+    } finally {
+      conn.release();
+    }
   } catch (e) {
     res.status(500).json({ success: false, error: String(e?.message || e) });
   }
 });
 
 app.get('/api/quotes/:id', async (req, res) => {
+  const businessId = getBusinessId(req);
+  if (!businessId) {
+    res.status(400).json({ success: false, error: 'Missing x-business-id' });
+    return;
+  }
   const quoteId = Number(req.params.id);
   if (!Number.isFinite(quoteId)) {
     res.status(400).json({ success: false, error: 'Invalid quote id' });
     return;
   }
   try {
+    await pool.query(`UPDATE quotes SET business_id = ? WHERE id = ? AND business_id IS NULL`, [businessId, quoteId]);
     const [qRows] = await pool.query(
       `SELECT
         q.id, q.customer_name, q.tax_id, q.expiry_date, q.subtotal, q.total, q.status, q.created_at,
@@ -123,9 +153,9 @@ app.get('/api/quotes/:id', async (req, res) => {
         qa.id_doc_data, qa.id_doc_mime, qa.id_doc_filename
        FROM quotes q
        LEFT JOIN quote_approvals qa ON qa.quote_id = q.id
-       WHERE q.id = ?
+       WHERE q.id = ? AND q.business_id = ?
        LIMIT 1`,
-      [quoteId]
+      [quoteId, businessId]
     );
     if (!qRows.length) {
       res.status(404).json({ success: false, error: 'Quote not found' });
@@ -209,6 +239,11 @@ app.get('/api/quotes/:id/signature', async (req, res) => {
 });
 
 app.post('/api/quotes', async (req, res) => {
+  const businessId = getBusinessId(req);
+  if (!businessId) {
+    res.status(400).json({ success: false, error: 'Missing x-business-id' });
+    return;
+  }
   const { customerName, taxId, expiry, items } = req.body || {};
   if (!customerName || !expiry || !Array.isArray(items) || items.length === 0) {
     res.status(400).json({ success: false, error: 'Missing customerName/expiry/items' });
@@ -222,9 +257,9 @@ app.post('/api/quotes', async (req, res) => {
   try {
     await conn.beginTransaction();
     const [r] = await conn.query(
-      `INSERT INTO quotes (customer_name, tax_id, expiry_date, subtotal, total, status)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [String(customerName), taxId ? String(taxId) : null, String(expiry), subtotal, total, 'Draft']
+      `INSERT INTO quotes (business_id, customer_name, tax_id, expiry_date, subtotal, total, status)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [businessId, String(customerName), taxId ? String(taxId) : null, String(expiry), subtotal, total, 'Draft']
     );
     const quoteId = r.insertId;
     for (const it of items) {
@@ -245,6 +280,11 @@ app.post('/api/quotes', async (req, res) => {
 });
 
 app.put('/api/quotes/:id', async (req, res) => {
+  const businessId = getBusinessId(req);
+  if (!businessId) {
+    res.status(400).json({ success: false, error: 'Missing x-business-id' });
+    return;
+  }
   const quoteId = Number(req.params.id);
   if (!Number.isFinite(quoteId)) {
     res.status(400).json({ success: false, error: 'Invalid quote id' });
@@ -262,7 +302,7 @@ app.put('/api/quotes/:id', async (req, res) => {
   const conn = await pool.getConnection();
   try {
     await conn.beginTransaction();
-    const [rows] = await conn.query(`SELECT id FROM quotes WHERE id = ?`, [quoteId]);
+    const [rows] = await conn.query(`SELECT id FROM quotes WHERE id = ? AND business_id = ?`, [quoteId, businessId]);
     if (!rows.length) {
       await conn.rollback();
       res.status(404).json({ success: false, error: 'Quote not found' });
@@ -301,13 +341,18 @@ app.put('/api/quotes/:id', async (req, res) => {
 });
 
 app.delete('/api/quotes/:id', async (req, res) => {
+  const businessId = getBusinessId(req);
+  if (!businessId) {
+    res.status(400).json({ success: false, error: 'Missing x-business-id' });
+    return;
+  }
   const quoteId = Number(req.params.id);
   if (!Number.isFinite(quoteId)) {
     res.status(400).json({ success: false, error: 'Invalid quote id' });
     return;
   }
   try {
-    const [r] = await pool.query(`DELETE FROM quotes WHERE id = ?`, [quoteId]);
+    const [r] = await pool.query(`DELETE FROM quotes WHERE id = ? AND business_id = ?`, [quoteId, businessId]);
     res.json({ success: true, affectedRows: r.affectedRows || 0 });
   } catch (e) {
     res.status(500).json({ success: false, error: String(e?.message || e) });
@@ -315,6 +360,11 @@ app.delete('/api/quotes/:id', async (req, res) => {
 });
 
 app.post('/api/quotes/:id/status', async (req, res) => {
+  const businessId = getBusinessId(req);
+  if (!businessId) {
+    res.status(400).json({ success: false, error: 'Missing x-business-id' });
+    return;
+  }
   const quoteId = Number(req.params.id);
   const { status } = req.body || {};
   if (!Number.isFinite(quoteId) || !status) {
@@ -322,7 +372,7 @@ app.post('/api/quotes/:id/status', async (req, res) => {
     return;
   }
   try {
-    const [r] = await pool.query(`UPDATE quotes SET status = ? WHERE id = ?`, [String(status), quoteId]);
+    const [r] = await pool.query(`UPDATE quotes SET status = ? WHERE id = ? AND business_id = ?`, [String(status), quoteId, businessId]);
     res.json({ success: true, affectedRows: r.affectedRows || 0 });
   } catch (e) {
     res.status(500).json({ success: false, error: String(e?.message || e) });
@@ -330,6 +380,11 @@ app.post('/api/quotes/:id/status', async (req, res) => {
 });
 
 app.post('/api/quotes/:id/approval-link', async (req, res) => {
+  const businessId = getBusinessId(req);
+  if (!businessId) {
+    res.status(400).json({ success: false, error: 'Missing x-business-id' });
+    return;
+  }
   const quoteId = Number(req.params.id);
   if (!Number.isFinite(quoteId)) {
     res.status(400).json({ success: false, error: 'Invalid quote id' });
@@ -341,7 +396,7 @@ app.post('/api/quotes/:id/approval-link', async (req, res) => {
   const conn = await pool.getConnection();
   try {
     await conn.beginTransaction();
-    const [rows] = await conn.query(`SELECT id FROM quotes WHERE id = ?`, [quoteId]);
+    const [rows] = await conn.query(`SELECT id FROM quotes WHERE id = ? AND business_id = ?`, [quoteId, businessId]);
     if (!rows.length) {
       await conn.rollback();
       res.status(404).json({ success: false, error: 'Quote not found' });
@@ -526,6 +581,11 @@ app.post('/public/q/:code/submit', async (req, res) => {
 });
 
 app.post('/api/quotes/:id/verify', async (req, res) => {
+  const businessId = getBusinessId(req);
+  if (!businessId) {
+    res.status(400).json({ success: false, error: 'Missing x-business-id' });
+    return;
+  }
   const quoteId = Number(req.params.id);
   const { verified } = req.body || {};
   if (!Number.isFinite(quoteId) || typeof verified !== 'boolean') {
@@ -537,7 +597,14 @@ app.post('/api/quotes/:id/verify', async (req, res) => {
   const conn = await pool.getConnection();
   try {
     await conn.beginTransaction();
-    const [rows] = await conn.query(`SELECT quote_id FROM quote_approvals WHERE quote_id = ? LIMIT 1`, [quoteId]);
+    const [rows] = await conn.query(
+      `SELECT qa.quote_id
+       FROM quote_approvals qa
+       JOIN quotes q ON q.id = qa.quote_id
+       WHERE qa.quote_id = ? AND q.business_id = ?
+       LIMIT 1`,
+      [quoteId, businessId]
+    );
     if (!rows.length) {
       await conn.rollback();
       res.status(404).json({ success: false, error: 'Approval not found' });

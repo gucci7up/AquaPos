@@ -6,6 +6,7 @@ import {
 import { useLanguage } from '../LanguageContext';
 import UserMenu from '../UserMenu';
 import { databases, Query } from '@/lib/appwrite';
+import { useTenant } from '../TenantContext';
 
 const DATABASE_ID = import.meta.env.VITE_APPWRITE_DATABASE_ID;
 const COLLECTION_SALES_ID = import.meta.env.VITE_APPWRITE_COLLECTION_SALES_ID || 'sales';
@@ -25,6 +26,7 @@ const fmt = (n: number) =>
 // ─── Component ───────────────────────────────────────────────────────────────
 export default function Finance() {
     const { t, language } = useLanguage();
+    const { businessId } = useTenant();
 
     const MONTH_LABELS = language === 'en' ? MONTHS_EN : MONTHS_ES;
 
@@ -41,14 +43,14 @@ export default function Finance() {
     // ── data fetching ─────────────────────────────────────────────────────────
     useEffect(() => {
         const load = async () => {
-            if (!DATABASE_ID) { setLoading(false); return; }
+            if (!DATABASE_ID || !businessId) { setLoading(false); return; }
             setLoading(true);
             try {
                 const [sRes, iRes, pRes, cRes] = await Promise.all([
-                    databases.listDocuments(DATABASE_ID, COLLECTION_SALES_ID, [Query.orderDesc('$createdAt'), Query.limit(500)]),
-                    databases.listDocuments(DATABASE_ID, COLLECTION_INVENTORY_ID, [Query.limit(500)]),
-                    databases.listDocuments(DATABASE_ID, COLLECTION_PAYMENTS_ID, [Query.orderDesc('$createdAt'), Query.limit(500)]),
-                    databases.listDocuments(DATABASE_ID, COLLECTION_CUSTOMERS_ID, [Query.limit(500)]),
+                    databases.listDocuments(DATABASE_ID, COLLECTION_SALES_ID, [Query.equal('businessId', businessId), Query.orderDesc('$createdAt'), Query.limit(500)]),
+                    databases.listDocuments(DATABASE_ID, COLLECTION_INVENTORY_ID, [Query.equal('businessId', businessId), Query.limit(500)]),
+                    databases.listDocuments(DATABASE_ID, COLLECTION_PAYMENTS_ID, [Query.equal('businessId', businessId), Query.orderDesc('$createdAt'), Query.limit(500)]),
+                    databases.listDocuments(DATABASE_ID, COLLECTION_CUSTOMERS_ID, [Query.equal('businessId', businessId), Query.limit(500)]),
                 ]);
                 setSales(sRes.documents);
                 setInventory(iRes.documents);
@@ -61,7 +63,7 @@ export default function Finance() {
             }
         };
         load();
-    }, []);
+    }, [businessId]);
 
     // ── KPI calculations ──────────────────────────────────────────────────────
     const now = new Date();

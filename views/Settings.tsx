@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useLanguage } from '../LanguageContext';
 import UserMenu from '../UserMenu';
-import { databases, storage, functions, ID, Query } from '@/lib/appwrite';
+import { databases, storage, ID, Query } from '@/lib/appwrite';
 import { useBranding } from '../BrandingContext';
+import { useTenant } from '../TenantContext';
 
 const DATABASE_ID = import.meta.env.VITE_APPWRITE_DATABASE_ID;
 const COLLECTION_SETTINGS_ID = import.meta.env.VITE_APPWRITE_COLLECTION_SETTINGS_ID || 'settings';
@@ -28,16 +29,11 @@ const initialUsers = [
     { id: 104, name: 'Ana Silva', email: 'ana@aquapos.la', role: 'Cashier', status: 'Pending', avatar: 'https://i.pravatar.cc/150?u=104' },
 ];
 
-const initialPlans = [
-    { id: 1, title: 'Entrepreneur', priceMonth: 0, priceYear: 0, features: ['1 User', '100 Products', 'Basic Reports'], highlighted: false },
-    { id: 2, title: 'Professional', priceMonth: 29, priceYear: 24, features: ['3 Users', 'Unlimited Products', 'Advanced Analytics', 'Inventory Alerts'], highlighted: true },
-    { id: 3, title: 'Enterprise', priceMonth: 99, priceYear: 79, features: ['Unlimited Users', 'API Access', 'Dedicated Support', 'White Label', 'Multi-Branch'], highlighted: false },
-];
-
 export default function Settings() {
     const { t, language, setLanguage, isDark, toggleDark } = useLanguage();
     const { reloadBranding } = useBranding();
-    const [activeTab, setActiveTab] = useState<'general' | 'branding' | 'team' | 'billing' | 'integrations'>('general');
+    const { businessId } = useTenant();
+    const [activeTab, setActiveTab] = useState<'general' | 'branding' | 'team' | 'integrations'>('general');
 
     // State: Business Profile
     const [profileData, setProfileData] = useState({
@@ -86,22 +82,16 @@ export default function Settings() {
         paperless: true
     });
 
-    // State: Billing & Plans
-    const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly');
-    const [plans, setPlans] = useState(initialPlans);
-    const [isPlanModalOpen, setIsPlanModalOpen] = useState(false);
-    const [editingPlan, setEditingPlan] = useState<any>(null);
-    const [planForm, setPlanForm] = useState({ title: '', priceMonth: '', priceYear: '', features: '', highlighted: false });
-
     // Fetch settings on mount
     useEffect(() => {
         fetchSettings();
     }, []);
 
     const fetchSettings = async () => {
-        if (!DATABASE_ID || !COLLECTION_SETTINGS_ID) return;
+        if (!DATABASE_ID || !COLLECTION_SETTINGS_ID || !businessId) return;
         try {
             const response = await databases.listDocuments(DATABASE_ID, COLLECTION_SETTINGS_ID, [
+                Query.equal('businessId', businessId),
                 Query.limit(1)
             ]);
             if (response.documents.length > 0) {
@@ -147,7 +137,7 @@ export default function Settings() {
     };
 
     const handleSaveProfile = async () => {
-        if (!DATABASE_ID || !COLLECTION_SETTINGS_ID) {
+        if (!DATABASE_ID || !COLLECTION_SETTINGS_ID || !businessId) {
             alert('Error: Settings Collection ID not configured');
             return;
         }
@@ -157,6 +147,7 @@ export default function Settings() {
             // Include branding file IDs and primary color in settings doc
             const dataToSave = {
                 ...profileData,
+                businessId,
                 branding_logoUrl: brandingFileIds.logoUrl || null,
                 branding_loginBg: brandingFileIds.loginBg || null,
                 branding_landingHero: brandingFileIds.landingHero || null,
@@ -246,8 +237,8 @@ export default function Settings() {
             setBranding(prev => ({ ...prev, [key]: getFilePreviewUrl(fileId) }));
 
             // Auto-save the new fileId to the settings document immediately
-            if (DATABASE_ID && COLLECTION_SETTINGS_ID) {
-                const patch = { [`branding_${key}`]: fileId };
+            if (DATABASE_ID && COLLECTION_SETTINGS_ID && businessId) {
+                const patch = { businessId, [`branding_${key}`]: fileId };
                 if (settingsDocId) {
                     await databases.updateDocument(DATABASE_ID, COLLECTION_SETTINGS_ID, settingsDocId, patch);
                 } else {
@@ -262,49 +253,6 @@ export default function Settings() {
             setUploadingKey(null);
             // Reset file input so same file can be re-selected
             e.target.value = '';
-        }
-    };
-
-    // Plan Handlers
-    const handleEditPlan = (plan: any) => {
-        setEditingPlan(plan);
-        setPlanForm({
-            title: plan.title,
-            priceMonth: plan.priceMonth.toString(),
-            priceYear: plan.priceYear.toString(),
-            features: plan.features.join('\n'),
-            highlighted: plan.highlighted
-        });
-        setIsPlanModalOpen(true);
-    };
-
-    const handleCreatePlan = () => {
-        setEditingPlan(null);
-        setPlanForm({ title: '', priceMonth: '', priceYear: '', features: '', highlighted: false });
-        setIsPlanModalOpen(true);
-    };
-
-    const savePlan = () => {
-        const planData = {
-            title: planForm.title,
-            priceMonth: parseFloat(planForm.priceMonth) || 0,
-            priceYear: parseFloat(planForm.priceYear) || 0,
-            features: planForm.features.split('\n').filter(f => f.trim() !== ''),
-            highlighted: planForm.highlighted
-        };
-
-        if (editingPlan) {
-            setPlans(plans.map(p => p.id === editingPlan.id ? { ...p, ...planData } : p));
-        } else {
-            setPlans([...plans, { id: Date.now(), ...planData }]);
-        }
-        setIsPlanModalOpen(false);
-    };
-
-    const deletePlan = () => {
-        if (editingPlan && confirm('Delete this plan?')) {
-            setPlans(plans.filter(p => p.id !== editingPlan.id));
-            setIsPlanModalOpen(false);
         }
     };
 
@@ -328,7 +276,6 @@ export default function Settings() {
                         <TabButton id="general" label={t('settings.tabs.general')} icon="tune" active={activeTab} onClick={setActiveTab} />
                         <TabButton id="branding" label={t('settings.tabs.branding')} icon="palette" active={activeTab} onClick={setActiveTab} />
                         <TabButton id="team" label={t('settings.tabs.team')} icon="group" active={activeTab} onClick={setActiveTab} />
-                        <TabButton id="billing" label={t('settings.tabs.billing')} icon="credit_card" active={activeTab} onClick={setActiveTab} />
                         <TabButton id="integrations" label={t('settings.tabs.integrations')} icon="extension" active={activeTab} onClick={setActiveTab} />
                     </div>
                 </div>
@@ -671,55 +618,6 @@ export default function Settings() {
                         </div>
                     )}
 
-                    {/* --- TAB: BILLING / PLANS (MODIFIED) --- */}
-                    {activeTab === 'billing' && (
-                        <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-300">
-                            <div className="text-center max-w-2xl mx-auto mb-8">
-                                <h3 className="text-2xl font-black text-slate-900 mb-2">{t('settings.plans.title')}</h3>
-                                <p className="text-slate-500 mb-6">{t('settings.plans.subtitle')}</p>
-
-                                <div className="inline-flex bg-white p-1 rounded-xl border border-slate-200 shadow-sm mb-4">
-                                    <button
-                                        onClick={() => setBillingCycle('monthly')}
-                                        className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${billingCycle === 'monthly' ? 'bg-slate-900 text-white shadow' : 'text-slate-500 hover:text-slate-900'}`}
-                                    >
-                                        Monthly
-                                    </button>
-                                    <button
-                                        onClick={() => setBillingCycle('yearly')}
-                                        className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${billingCycle === 'yearly' ? 'bg-slate-900 text-white shadow' : 'text-slate-500 hover:text-slate-900'}`}
-                                    >
-                                        Yearly <span className="text-emerald-400 text-[10px] ml-1">-20%</span>
-                                    </button>
-                                </div>
-
-                                <button onClick={handleCreatePlan} className="block mx-auto mt-2 text-sm font-bold text-primary hover:underline">
-                                    + Create New Plan
-                                </button>
-                            </div>
-
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                {plans.map(plan => (
-                                    <div key={plan.id} className="relative group">
-                                        <button
-                                            onClick={() => handleEditPlan(plan)}
-                                            className="absolute top-2 right-2 p-2 bg-white rounded-full shadow-md text-slate-400 hover:text-primary z-10 opacity-0 group-hover:opacity-100 transition-opacity"
-                                        >
-                                            <span className="material-symbols-outlined">edit</span>
-                                        </button>
-                                        <PlanCard
-                                            title={plan.title}
-                                            price={billingCycle === 'monthly' ? plan.priceMonth.toString() : plan.priceYear.toString()}
-                                            current={false}
-                                            highlight={plan.highlighted}
-                                            features={plan.features}
-                                        />
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-
                     {/* ... (Integrations Tab content remains the same) ... */}
                     {activeTab === 'integrations' && (
                         <section className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-300">
@@ -789,75 +687,6 @@ export default function Settings() {
                     </div>
                 </div>
             )}
-
-            {/* Plan Editor Modal (New) */}
-            {isPlanModalOpen && (
-                <div className="absolute inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-                    <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl flex flex-col animate-in zoom-in-95">
-                        <div className="p-6 border-b border-slate-100 flex justify-between items-center">
-                            <h3 className="text-xl font-black text-slate-900">{editingPlan ? 'Edit Plan' : 'Create New Plan'}</h3>
-                            <button onClick={() => setIsPlanModalOpen(false)} className="text-slate-400 hover:text-slate-600"><span className="material-symbols-outlined">close</span></button>
-                        </div>
-                        <div className="p-6 space-y-4">
-                            <div className="space-y-1">
-                                <label className="text-xs font-bold text-slate-500 uppercase">Plan Name</label>
-                                <input
-                                    className="w-full bg-slate-50 border border-slate-200 rounded-lg p-3 outline-none focus:border-primary"
-                                    value={planForm.title}
-                                    onChange={e => setPlanForm({ ...planForm, title: e.target.value })}
-                                    placeholder="e.g. Enterprise Plus"
-                                />
-                            </div>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-1">
-                                    <label className="text-xs font-bold text-slate-500 uppercase">Monthly Price ($)</label>
-                                    <input
-                                        type="number"
-                                        className="w-full bg-slate-50 border border-slate-200 rounded-lg p-3 outline-none focus:border-primary"
-                                        value={planForm.priceMonth}
-                                        onChange={e => setPlanForm({ ...planForm, priceMonth: e.target.value })}
-                                    />
-                                </div>
-                                <div className="space-y-1">
-                                    <label className="text-xs font-bold text-slate-500 uppercase">Yearly Price ($)</label>
-                                    <input
-                                        type="number"
-                                        className="w-full bg-slate-50 border border-slate-200 rounded-lg p-3 outline-none focus:border-primary"
-                                        value={planForm.priceYear}
-                                        onChange={e => setPlanForm({ ...planForm, priceYear: e.target.value })}
-                                    />
-                                </div>
-                            </div>
-                            <div className="space-y-1">
-                                <label className="text-xs font-bold text-slate-500 uppercase">Features (One per line)</label>
-                                <textarea
-                                    className="w-full bg-slate-50 border border-slate-200 rounded-lg p-3 outline-none focus:border-primary h-32 resize-none"
-                                    value={planForm.features}
-                                    onChange={e => setPlanForm({ ...planForm, features: e.target.value })}
-                                    placeholder="Unlimited Users&#10;24/7 Support..."
-                                ></textarea>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <input
-                                    type="checkbox"
-                                    id="highlight"
-                                    checked={planForm.highlighted}
-                                    onChange={e => setPlanForm({ ...planForm, highlighted: e.target.checked })}
-                                    className="size-4 rounded border-gray-300 text-primary focus:ring-primary"
-                                />
-                                <label htmlFor="highlight" className="text-sm font-medium text-slate-700">Highlight this plan (Recommended)</label>
-                            </div>
-                        </div>
-                        <div className="p-6 border-t border-slate-100 bg-slate-50 flex justify-between">
-                            <button onClick={deletePlan} className="text-red-500 font-bold text-sm hover:underline">Delete Plan</button>
-                            <div className="flex gap-3">
-                                <button onClick={() => setIsPlanModalOpen(false)} className="px-4 py-2 border border-slate-200 bg-white text-slate-700 font-bold rounded-lg hover:bg-slate-50">{t('settings.cancel')}</button>
-                                <button onClick={savePlan} className="px-6 py-2 bg-primary text-white font-bold rounded-lg shadow-lg hover:brightness-105">{t('settings.save')}</button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
         </>
     );
 }
@@ -920,38 +749,6 @@ const ImageManager = ({ label, value, onUpload, helpText, isUploading }: any) =>
         </div>
     );
 };
-
-const PlanCard = ({ title, price, features, current, highlight }: any) => (
-    <div className={`rounded-2xl p-6 border h-full flex flex-col ${highlight ? 'border-primary ring-4 ring-primary/10 shadow-xl bg-white relative' : 'border-slate-200 bg-slate-50'}`}>
-        {current && (
-            <span className="absolute top-4 right-4 bg-emerald-100 text-emerald-600 text-[10px] font-bold px-2 py-1 rounded uppercase">Current Plan</span>
-        )}
-        <h4 className="text-lg font-bold text-slate-900 mb-2">{title}</h4>
-        <div className="flex items-end gap-1 mb-6">
-            <span className="text-4xl font-black text-slate-900">${price}</span>
-            <span className="text-slate-500 font-medium mb-1">/mo</span>
-        </div>
-        <ul className="space-y-3 mb-8 flex-1">
-            {features.map((feat: string, idx: number) => (
-                <li key={idx} className="flex items-center gap-2 text-sm text-slate-600">
-                    <span className={`material-symbols-outlined text-lg ${highlight ? 'text-primary' : 'text-slate-400'}`}>check_circle</span>
-                    {feat}
-                </li>
-            ))}
-        </ul>
-        <button
-            disabled={current}
-            className={`w-full py-3 rounded-xl font-bold transition-all ${current
-                ? 'bg-slate-200 text-slate-500 cursor-default'
-                : highlight
-                    ? 'bg-primary text-white hover:brightness-105 shadow-lg'
-                    : 'bg-white border border-slate-200 text-slate-900 hover:bg-slate-100'
-                }`}
-        >
-            {current ? 'Active' : 'Upgrade'}
-        </button>
-    </div>
-);
 
 const IntegrationRow = ({ icon, name, desc, color, checked, onChange }: any) => {
     const colors: any = {

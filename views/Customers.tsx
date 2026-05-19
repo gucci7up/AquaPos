@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { useLanguage } from '../LanguageContext';
 import UserMenu from '../UserMenu';
 import { databases, ID, Query } from '@/lib/appwrite';
+import { useTenant } from '../TenantContext';
 
 const DATABASE_ID = import.meta.env.VITE_APPWRITE_DATABASE_ID;
 const COLLECTION_ID = import.meta.env.VITE_APPWRITE_COLLECTION_CUSTOMERS_ID || 'customers';
@@ -13,6 +14,7 @@ const initialCustomers: any[] = [];
 
 export default function Customers() {
   const { t } = useLanguage();
+  const { businessId } = useTenant();
   const [customers, setCustomers] = useState<any[]>([]);
   const [selectedId, setSelectedId] = useState<string | number | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -21,7 +23,7 @@ export default function Customers() {
 
   useEffect(() => {
     fetchCustomers();
-  }, []);
+  }, [businessId]);
 
   const [customerHistory, setCustomerHistory] = useState<any[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -33,16 +35,18 @@ export default function Customers() {
   }, [selectedId]);
 
   const fetchCustomerHistory = async (customerId: string) => {
-    if (!DATABASE_ID || !COLLECTION_SALES_ID || !COLLECTION_PAYMENTS_ID) return;
+    if (!DATABASE_ID || !COLLECTION_SALES_ID || !COLLECTION_PAYMENTS_ID || !businessId) return;
     try {
       setHistoryLoading(true);
       const [salesRes, paymentsRes] = await Promise.all([
         databases.listDocuments(DATABASE_ID, COLLECTION_SALES_ID, [
+          Query.equal('businessId', businessId),
           Query.equal('customerId', customerId),
           Query.orderDesc('date'),
           Query.limit(50)
         ]),
         databases.listDocuments(DATABASE_ID, COLLECTION_PAYMENTS_ID, [
+          Query.equal('businessId', businessId),
           Query.equal('customerId', customerId),
           Query.orderDesc('date'),
           Query.limit(50)
@@ -62,17 +66,19 @@ export default function Customers() {
   };
 
   const handleSyncBalances = async () => {
-    if (!DATABASE_ID || !COLLECTION_ID || !COLLECTION_SALES_ID || !COLLECTION_PAYMENTS_ID || !selectedCustomer) return;
+    if (!DATABASE_ID || !COLLECTION_ID || !COLLECTION_SALES_ID || !COLLECTION_PAYMENTS_ID || !selectedCustomer || !businessId) return;
 
     setLoading(true);
     try {
       // Fetch ALL sales and payments for this customer
       const [salesRes, paymentsRes] = await Promise.all([
         databases.listDocuments(DATABASE_ID, COLLECTION_SALES_ID, [
+          Query.equal('businessId', businessId),
           Query.equal('customerId', selectedCustomer.id),
           Query.limit(100)
         ]),
         databases.listDocuments(DATABASE_ID, COLLECTION_PAYMENTS_ID, [
+          Query.equal('businessId', businessId),
           Query.equal('customerId', selectedCustomer.id),
           Query.limit(100)
         ])
@@ -102,7 +108,7 @@ export default function Customers() {
   };
 
   const handlePayment = async () => {
-    if (!DATABASE_ID || !COLLECTION_PAYMENTS_ID || !selectedCustomer) return;
+    if (!DATABASE_ID || !COLLECTION_PAYMENTS_ID || !selectedCustomer || !businessId) return;
 
     setIsProcessingPayment(true);
     try {
@@ -113,6 +119,7 @@ export default function Customers() {
       }
 
       const paymentData = {
+        businessId,
         customerId: selectedCustomer.$id || selectedCustomer.id,
         customerName: selectedCustomer.name,
         amount: amount,
@@ -150,13 +157,14 @@ export default function Customers() {
   };
 
   const fetchCustomers = async () => {
-    if (!DATABASE_ID || !COLLECTION_ID) {
+    if (!DATABASE_ID || !COLLECTION_ID || !businessId) {
       setLoading(false);
       return;
     }
     try {
       setLoading(true);
       const response = await databases.listDocuments(DATABASE_ID, COLLECTION_ID, [
+        Query.equal('businessId', businessId),
         Query.orderDesc('$createdAt')
       ]);
       const mapped = response.documents.map(doc => ({
@@ -225,7 +233,7 @@ export default function Customers() {
   };
 
   const handleSave = async () => {
-    if (!DATABASE_ID || !COLLECTION_ID) return;
+    if (!DATABASE_ID || !COLLECTION_ID || !businessId) return;
 
     setLoading(true);
     try {
@@ -236,6 +244,7 @@ export default function Customers() {
         tier: formData.tier,
         status: formData.status,
         notes: formData.notes,
+        businessId,
       };
 
       if (editingCustomer) {
@@ -261,7 +270,7 @@ export default function Customers() {
   };
 
   const handleDelete = async () => {
-    if (!DATABASE_ID || !COLLECTION_ID) return;
+    if (!DATABASE_ID || !COLLECTION_ID || !businessId) return;
     if (selectedCustomer && confirm(`Delete customer ${selectedCustomer.name}?`)) {
       setLoading(true);
       try {

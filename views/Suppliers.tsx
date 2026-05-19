@@ -3,6 +3,7 @@ import { useLanguage } from '../LanguageContext';
 import UserMenu from '../UserMenu';
 import { databases, functions, ID, Query } from '@/lib/appwrite';
 import { PrintTemplates } from '../components/PrintTemplates';
+import { useTenant } from '../TenantContext';
 
 const DATABASE_ID = import.meta.env.VITE_APPWRITE_DATABASE_ID;
 const COLLECTION_INVENTORY_ID = import.meta.env.VITE_APPWRITE_COLLECTION_INVENTORY_ID || 'inventory';
@@ -18,6 +19,7 @@ const initialOrdersFallback: any[] = [];
 
 export default function Suppliers() {
     const { t } = useLanguage();
+    const { businessId } = useTenant();
     const [activeTab, setActiveTab] = useState<'orders' | 'suppliers'>('orders');
     const [searchQuery, setSearchQuery] = useState('');
 
@@ -34,12 +36,15 @@ export default function Suppliers() {
     useEffect(() => {
         fetchInitialData();
         fetchBusinessSettings();
-    }, []);
+    }, [businessId]);
 
     const fetchBusinessSettings = async () => {
-        if (!DATABASE_ID || !COLLECTION_SETTINGS_ID) return;
+        if (!DATABASE_ID || !COLLECTION_SETTINGS_ID || !businessId) return;
         try {
-            const response = await databases.listDocuments(DATABASE_ID, COLLECTION_SETTINGS_ID, [Query.limit(1)]);
+            const response = await databases.listDocuments(DATABASE_ID, COLLECTION_SETTINGS_ID, [
+                Query.equal('businessId', businessId),
+                Query.limit(1)
+            ]);
             if (response.documents.length > 0) setBusinessSettings(response.documents[0]);
         } catch (error) {
             console.error('Error fetching settings for Suppliers:', error);
@@ -47,13 +52,13 @@ export default function Suppliers() {
     };
 
     const fetchInitialData = async () => {
-        if (!DATABASE_ID) return;
+        if (!DATABASE_ID || !businessId) return;
         setLoading(true);
         try {
             const [suppRes, ordRes, prodRes] = await Promise.all([
-                COLLECTION_SUPPLIERS_ID ? databases.listDocuments(DATABASE_ID, COLLECTION_SUPPLIERS_ID) : Promise.resolve({ documents: [] }),
-                COLLECTION_ORDERS_ID ? databases.listDocuments(DATABASE_ID, COLLECTION_ORDERS_ID, [Query.orderDesc('$createdAt')]) : Promise.resolve({ documents: [] }),
-                COLLECTION_INVENTORY_ID ? databases.listDocuments(DATABASE_ID, COLLECTION_INVENTORY_ID) : Promise.resolve({ documents: [] })
+                COLLECTION_SUPPLIERS_ID ? databases.listDocuments(DATABASE_ID, COLLECTION_SUPPLIERS_ID, [Query.equal('businessId', businessId), Query.limit(200)]) : Promise.resolve({ documents: [] }),
+                COLLECTION_ORDERS_ID ? databases.listDocuments(DATABASE_ID, COLLECTION_ORDERS_ID, [Query.equal('businessId', businessId), Query.orderDesc('$createdAt'), Query.limit(200)]) : Promise.resolve({ documents: [] }),
+                COLLECTION_INVENTORY_ID ? databases.listDocuments(DATABASE_ID, COLLECTION_INVENTORY_ID, [Query.equal('businessId', businessId), Query.limit(500)]) : Promise.resolve({ documents: [] })
             ]);
 
             setSuppliers(suppRes.documents.map(d => ({ ...d, id: d.$id })));
@@ -104,7 +109,7 @@ export default function Suppliers() {
     };
 
     const handleSaveSupplier = async () => {
-        if (!supplierForm.name || !DATABASE_ID || !COLLECTION_SUPPLIERS_ID) return;
+        if (!supplierForm.name || !DATABASE_ID || !COLLECTION_SUPPLIERS_ID || !businessId) return;
 
         setLoading(true);
         try {
@@ -115,7 +120,8 @@ export default function Suppliers() {
                 phone: supplierForm.phone,
                 category: supplierForm.category,
                 leadTime: supplierForm.leadTime,
-                address: supplierForm.address
+                address: supplierForm.address,
+                businessId,
             };
 
             if (editingSupplierId) {
@@ -170,7 +176,7 @@ export default function Suppliers() {
     };
 
     const handleSaveOrder = async (status: 'Draft' | 'Ordered') => {
-        if (!orderForm.supplierId || !DATABASE_ID || !COLLECTION_ORDERS_ID) return alert("Please select a supplier");
+        if (!orderForm.supplierId || !DATABASE_ID || !COLLECTION_ORDERS_ID || !businessId) return alert("Please select a supplier");
         if (orderForm.items.length === 0) return alert("Please add at least one item");
 
         setLoading(true);
@@ -179,6 +185,7 @@ export default function Suppliers() {
             const total = orderForm.items.reduce((acc: number, item: any) => acc + item.total, 0);
 
             const orderData = {
+                businessId,
                 supplierId: orderForm.supplierId,
                 supplierName: supplier?.name || 'Unknown',
                 date: new Date().toISOString(),
@@ -208,13 +215,14 @@ export default function Suppliers() {
             alert("Reception function not configured.");
             return;
         }
+        if (!businessId) return;
 
         if (window.confirm("Mark this order as Received? This will update your inventory stock.")) {
             setLoading(true);
             try {
                 const execution = await functions.createExecution(
                     FUNCTION_RECEIVE_STOCK_ID,
-                    JSON.stringify({ orderId })
+                    JSON.stringify({ orderId, businessId })
                 );
                 const response = JSON.parse(execution.responseBody);
                 if (response.success) {
@@ -234,7 +242,7 @@ export default function Suppliers() {
     };
 
     const handleDeleteOrder = async (id: string) => {
-        if (!DATABASE_ID || !COLLECTION_ORDERS_ID) return;
+        if (!DATABASE_ID || !COLLECTION_ORDERS_ID || !businessId) return;
         if (window.confirm("Delete this order?")) {
             setLoading(true);
             try {

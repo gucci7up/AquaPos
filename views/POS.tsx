@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { useLanguage } from '../LanguageContext';
 import { databases, functions, ID, Query } from '@/lib/appwrite';
 import { PrintTemplates } from '../components/PrintTemplates';
+import { useTenant } from '../TenantContext';
 
 const DATABASE_ID = import.meta.env.VITE_APPWRITE_DATABASE_ID;
 const COLLECTION_INVENTORY_ID = import.meta.env.VITE_APPWRITE_COLLECTION_INVENTORY_ID || 'inventory';
@@ -26,6 +27,7 @@ const buildLogoUrl = (fileId: string | null | undefined): string | undefined => 
 
 export default function POS() {
   const { t } = useLanguage();
+  const { businessId } = useTenant();
 
   // helper to get category display name
   const getCategoryDisplay = (cat: string) => {
@@ -54,12 +56,15 @@ export default function POS() {
   // Fetch products from Appwrite
   useEffect(() => {
     const fetchProducts = async () => {
-      if (!DATABASE_ID || !COLLECTION_INVENTORY_ID) {
+      if (!DATABASE_ID || !COLLECTION_INVENTORY_ID || !businessId) {
         setLoading(false);
         return;
       }
       try {
-        const response = await databases.listDocuments(DATABASE_ID, COLLECTION_INVENTORY_ID);
+        const response = await databases.listDocuments(DATABASE_ID, COLLECTION_INVENTORY_ID, [
+          Query.equal('businessId', businessId),
+          Query.limit(500),
+        ]);
         console.log('POS Fetched Products Raw:', response.documents.length);
         const mapped = response.documents.map((doc: any) => ({
           id: doc.$id,
@@ -81,12 +86,13 @@ export default function POS() {
     fetchProducts();
     fetchCategories();
     fetchBusinessSettings();
-  }, []);
+  }, [businessId]);
 
   const fetchBusinessSettings = async () => {
-    if (!DATABASE_ID || !COLLECTION_SETTINGS_ID) return;
+    if (!DATABASE_ID || !COLLECTION_SETTINGS_ID || !businessId) return;
     try {
       const response = await databases.listDocuments(DATABASE_ID, COLLECTION_SETTINGS_ID, [
+        Query.equal('businessId', businessId),
         Query.limit(1)
       ]);
       if (response.documents.length > 0) {
@@ -120,7 +126,7 @@ export default function POS() {
 
   const generateQuote = async () => {
     if (cart.length === 0) return;
-    if (!DATABASE_ID || !COLLECTION_QUOTES_ID) {
+    if (!DATABASE_ID || !COLLECTION_QUOTES_ID || !businessId) {
       alert('Error: Colección de cotizaciones no configurada.');
       return;
     }
@@ -128,6 +134,7 @@ export default function POS() {
     setPaymentStep('process');
     try {
       const quoteData = {
+        businessId,
         customerId: activeCustomer?.$id || activeCustomer?.id || null,
         customerName: activeCustomer?.name || 'Cliente General',
         items: JSON.stringify(cart.map(item => ({ id: item.id, name: item.name, quantity: item.quantity, price: item.price }))),
@@ -158,9 +165,12 @@ export default function POS() {
   };
 
   const fetchCategories = async () => {
-    if (!DATABASE_ID || !COLLECTION_CATEGORIES_ID) return;
+    if (!DATABASE_ID || !COLLECTION_CATEGORIES_ID || !businessId) return;
     try {
-      const response = await databases.listDocuments(DATABASE_ID, COLLECTION_CATEGORIES_ID);
+      const response = await databases.listDocuments(DATABASE_ID, COLLECTION_CATEGORIES_ID, [
+        Query.equal('businessId', businessId),
+        Query.limit(200),
+      ]);
       const collectionCats = response.documents.map(doc => doc.name);
 
       // Only use database categories, ensuring 'All' is at the start for filtering
@@ -183,9 +193,12 @@ export default function POS() {
   // Fetch customers from Appwrite
   useEffect(() => {
     const fetchCustomers = async () => {
-      if (!DATABASE_ID || !COLLECTION_CUSTOMERS_ID) return;
+      if (!DATABASE_ID || !COLLECTION_CUSTOMERS_ID || !businessId) return;
       try {
-        const response = await databases.listDocuments(DATABASE_ID, COLLECTION_CUSTOMERS_ID);
+        const response = await databases.listDocuments(DATABASE_ID, COLLECTION_CUSTOMERS_ID, [
+          Query.equal('businessId', businessId),
+          Query.limit(200),
+        ]);
         setCustomers(response.documents.map(doc => ({
           ...doc,
           id: doc.$id
@@ -195,7 +208,7 @@ export default function POS() {
       }
     };
     fetchCustomers();
-  }, []);
+  }, [businessId]);
   const [customerViewMode, setCustomerViewMode] = useState<'search' | 'create'>('search');
   const [newCustomerForm, setNewCustomerForm] = useState({ name: '', email: '', phone: '' });
 
@@ -310,7 +323,7 @@ export default function POS() {
   const processSaleBackend = async (method: string) => {
     setPaymentStep('process');
 
-    if (!DATABASE_ID || !COLLECTION_SALES_ID || !COLLECTION_INVENTORY_ID) {
+    if (!DATABASE_ID || !COLLECTION_SALES_ID || !COLLECTION_INVENTORY_ID || !businessId) {
       console.error('POS Error: Missing IDs', { DATABASE_ID, COLLECTION_SALES_ID, COLLECTION_INVENTORY_ID });
       alert('Error: La configuración de la base de datos no está completa.');
       setPaymentStep('select');
@@ -320,6 +333,7 @@ export default function POS() {
     try {
       // 1. Create Sale Document Client-Side
       const saleData = {
+        businessId,
         customerId: activeCustomer?.$id || activeCustomer?.id || null,
         customerName: activeCustomer?.name || 'Guest',
         items: JSON.stringify(cart.map(item => ({ id: item.id, name: item.name, quantity: item.quantity, price: item.price }))),

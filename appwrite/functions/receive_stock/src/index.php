@@ -28,10 +28,17 @@ return function ($context) {
     }
 
     $orderId = $payload['orderId'];
+    $businessId = $payload['businessId'] ?? null;
 
     try {
         // 1. Fetch Order
         $order = $databases->getDocument($databaseId, $ordersCollectionId, $orderId);
+        if ($businessId && isset($order['businessId']) && $order['businessId'] !== $businessId) {
+            return $context->res->json([
+                'success' => false,
+                'error' => 'Order does not belong to this business.'
+            ], 403);
+        }
 
         if ($order['status'] === 'Received') {
             return $context->res->json([
@@ -49,6 +56,9 @@ return function ($context) {
 
             // Fetch current product to get latest stock
             $product = $databases->getDocument($databaseId, $inventoryCollectionId, $productId);
+            if ($businessId && isset($product['businessId']) && $product['businessId'] !== $businessId) {
+                continue;
+            }
             $newStock = (int) $product['stock'] + $quantityAdded;
 
             $databases->updateDocument(

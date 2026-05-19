@@ -3,6 +3,7 @@ import { useLanguage } from '../LanguageContext';
 import UserMenu from '../UserMenu';
 import { databases, Query } from '@/lib/appwrite';
 import { PrintTemplates } from '../components/PrintTemplates';
+import { useTenant } from '../TenantContext';
 
 const DATABASE_ID = import.meta.env.VITE_APPWRITE_DATABASE_ID;
 const COLLECTION_SALES_ID = import.meta.env.VITE_APPWRITE_COLLECTION_SALES_ID || 'sales';
@@ -10,6 +11,7 @@ const COLLECTION_SETTINGS_ID = import.meta.env.VITE_APPWRITE_COLLECTION_SETTINGS
 
 export default function Sales() {
   const { t } = useLanguage();
+  const { businessId } = useTenant();
   const [transactions, setTransactions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -23,12 +25,13 @@ export default function Sales() {
   useEffect(() => {
     fetchSales();
     fetchBusinessSettings();
-  }, [dateRange]);
+  }, [dateRange, businessId]);
 
   const fetchBusinessSettings = async () => {
-    if (!DATABASE_ID || !COLLECTION_SETTINGS_ID) return;
+    if (!DATABASE_ID || !COLLECTION_SETTINGS_ID || !businessId) return;
     try {
       const response = await databases.listDocuments(DATABASE_ID, COLLECTION_SETTINGS_ID, [
+        Query.equal('businessId', businessId),
         Query.limit(1)
       ]);
       if (response.documents.length > 0) {
@@ -40,13 +43,13 @@ export default function Sales() {
   };
 
   const fetchSales = async () => {
-    if (!DATABASE_ID || !COLLECTION_SALES_ID) {
+    if (!DATABASE_ID || !COLLECTION_SALES_ID || !businessId) {
       setLoading(false);
       return;
     }
     try {
       setLoading(true);
-      const queries = [Query.orderDesc('$createdAt'), Query.limit(100)];
+      const queries = [Query.equal('businessId', businessId), Query.orderDesc('$createdAt'), Query.limit(100)];
 
       if (dateRange === 'Today') {
         const today = new Date();

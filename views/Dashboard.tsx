@@ -7,6 +7,7 @@ import {
 import { useLanguage } from '../LanguageContext';
 import UserMenu from '../UserMenu';
 import { databases, Query } from '@/lib/appwrite';
+import { useTenant } from '../TenantContext';
 
 // ── Appwrite config ──────────────────────────────────────────────────────────
 const DB = import.meta.env.VITE_APPWRITE_DATABASE_ID;
@@ -50,6 +51,7 @@ const DAY_KEYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 // ── Component ────────────────────────────────────────────────────────────────
 export default function Dashboard() {
   const { t, language } = useLanguage();
+  const { businessId } = useTenant();
   const isEs = language === 'es';
   const navigate = useNavigate();
 
@@ -69,15 +71,15 @@ export default function Dashboard() {
 
   // ── Fetch ────────────────────────────────────────────────────────────────
   const load = useCallback(async () => {
-    if (!DB) { setLoading(false); return; }
+    if (!DB || !businessId) { setLoading(false); return; }
     setLoading(true);
     try {
       const [sal, inv, cus, quo, pay] = await Promise.allSettled([
-        fetchAll(COL_SAL, [Query.orderDesc('$createdAt')]),
-        fetchAll(COL_INV),
-        fetchAll(COL_CUS),
-        fetchAll(COL_QUO),
-        fetchAll(COL_PAY, [Query.orderDesc('$createdAt')]),
+        fetchAll(COL_SAL, [Query.equal('businessId', businessId), Query.orderDesc('$createdAt')]),
+        fetchAll(COL_INV, [Query.equal('businessId', businessId)]),
+        fetchAll(COL_CUS, [Query.equal('businessId', businessId)]),
+        fetchAll(COL_QUO, [Query.equal('businessId', businessId)]),
+        fetchAll(COL_PAY, [Query.equal('businessId', businessId), Query.orderDesc('$createdAt')]),
       ]);
       setSales(sal.status === 'fulfilled' ? sal.value : []);
       setInv(inv.status === 'fulfilled' ? inv.value : []);
@@ -87,7 +89,7 @@ export default function Dashboard() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [businessId]);
 
   useEffect(() => {
     load();

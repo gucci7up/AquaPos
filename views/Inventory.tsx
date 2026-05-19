@@ -3,6 +3,7 @@ import { useLanguage } from '../LanguageContext';
 import UserMenu from '../UserMenu';
 import { databases, storage, ID, Query } from '@/lib/appwrite';
 import { useNavigate } from 'react-router-dom';
+import { useTenant } from '../TenantContext';
 
 const DATABASE_ID = import.meta.env.VITE_APPWRITE_DATABASE_ID;
 const COLLECTION_ID = import.meta.env.VITE_APPWRITE_COLLECTION_INVENTORY_ID || 'inventory';
@@ -13,6 +14,7 @@ const initialProducts: any[] = [];
 
 export default function Inventory() {
   const { t } = useLanguage();
+  const { businessId } = useTenant();
   const navigate = useNavigate();
   const [products, setProducts] = useState(initialProducts);
   const [categories, setCategories] = useState<string[]>(['General']);
@@ -34,12 +36,15 @@ export default function Inventory() {
   useEffect(() => {
     fetchProducts();
     fetchCategories();
-  }, []);
+  }, [businessId]);
 
   const fetchCategories = async () => {
-    if (!DATABASE_ID || !COLLECTION_CATEGORIES_ID) return;
+    if (!DATABASE_ID || !COLLECTION_CATEGORIES_ID || !businessId) return;
     try {
-      const response = await databases.listDocuments(DATABASE_ID, COLLECTION_CATEGORIES_ID);
+      const response = await databases.listDocuments(DATABASE_ID, COLLECTION_CATEGORIES_ID, [
+        Query.equal('businessId', businessId),
+        Query.limit(200),
+      ]);
       const collectionCats = response.documents.map(doc => doc.name);
 
       // Only use database categories, or fallback to ['General'] if empty
@@ -53,7 +58,7 @@ export default function Inventory() {
   };
 
   const fetchProducts = async () => {
-    if (!DATABASE_ID || !COLLECTION_ID) {
+    if (!DATABASE_ID || !COLLECTION_ID || !businessId) {
       console.warn('Appwrite IDs missing');
       setLoading(false);
       return;
@@ -62,6 +67,7 @@ export default function Inventory() {
     try {
       setLoading(true);
       const response = await databases.listDocuments(DATABASE_ID, COLLECTION_ID, [
+        Query.equal('businessId', businessId),
         Query.orderDesc('$createdAt'),
         Query.limit(100)
       ]);
@@ -175,7 +181,7 @@ export default function Inventory() {
   };
 
   const handleSave = async () => {
-    if (!DATABASE_ID || !COLLECTION_ID) return;
+    if (!DATABASE_ID || !COLLECTION_ID || !businessId) return;
 
     setLoading(true);
     setUploading(true);
@@ -193,7 +199,7 @@ export default function Inventory() {
         }
       }
 
-      const submissionData = { ...formData, image: imageUrl };
+      const submissionData: any = { ...formData, image: imageUrl, businessId };
 
       // Clean data types for Appwrite
       submissionData.stock = parseInt(submissionData.stock as any) || 0;
@@ -223,7 +229,7 @@ export default function Inventory() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!DATABASE_ID || !COLLECTION_ID) return;
+    if (!DATABASE_ID || !COLLECTION_ID || !businessId) return;
     if (confirm('Are you sure you want to delete this product?')) {
       setLoading(true);
       try {
@@ -244,9 +250,9 @@ export default function Inventory() {
       setNewCategoryName('');
 
       // Save to Appwrite for persistence
-      if (DATABASE_ID && COLLECTION_CATEGORIES_ID) {
+      if (DATABASE_ID && COLLECTION_CATEGORIES_ID && businessId) {
         try {
-          await databases.createDocument(DATABASE_ID, COLLECTION_CATEGORIES_ID, ID.unique(), { name });
+          await databases.createDocument(DATABASE_ID, COLLECTION_CATEGORIES_ID, ID.unique(), { name, businessId });
         } catch (error: any) {
           console.error('Error saving category to Appwrite:', error);
         }
@@ -262,9 +268,10 @@ export default function Inventory() {
       if (filterCategory === cat) setFilterCategory('All');
 
       // Delete from Appwrite
-      if (DATABASE_ID && COLLECTION_CATEGORIES_ID) {
+      if (DATABASE_ID && COLLECTION_CATEGORIES_ID && businessId) {
         try {
           const response = await databases.listDocuments(DATABASE_ID, COLLECTION_CATEGORIES_ID, [
+            Query.equal('businessId', businessId),
             Query.equal('name', cat)
           ]);
           if (response.documents.length > 0) {

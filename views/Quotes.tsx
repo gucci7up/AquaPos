@@ -3,6 +3,7 @@ import { useLanguage } from '../LanguageContext';
 import { useBranding } from '../BrandingContext';
 import UserMenu from '../UserMenu';
 import { PrintTemplates } from '../components/PrintTemplates';
+import { useTenant } from '../TenantContext';
 
 const ENDPOINT = import.meta.env.VITE_APPWRITE_ENDPOINT;
 const PROJECT_ID = import.meta.env.VITE_APPWRITE_PROJECT_ID;
@@ -15,6 +16,7 @@ const initialQuotes: any[] = [];
 export default function Quotes() {
   const { t } = useLanguage();
   const { branding } = useBranding();
+  const { businessId } = useTenant();
   const [quotes, setQuotes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [workingQuoteId, setWorkingQuoteId] = useState<string | null>(null);
@@ -25,12 +27,15 @@ export default function Quotes() {
 
   React.useEffect(() => {
     fetchQuotes();
-  }, []);
+  }, [businessId]);
+
+  const apiHeaders = () => (businessId ? { 'x-business-id': businessId } : {});
 
   const fetchQuotes = async () => {
+    if (!businessId) return;
     try {
       setLoading(true);
-      const r = await fetch(`${API_BASE}/api/quotes`, { credentials: 'include' });
+      const r = await fetch(`${API_BASE}/api/quotes`, { credentials: 'include', headers: apiHeaders() });
       const data = await r.json().catch(() => null);
       if (!r.ok || !data?.success) throw new Error(data?.error || 'No se pudieron cargar las cotizaciones.');
       const mapped = (data.quotes || []).map((row: any) => ({
@@ -101,7 +106,8 @@ export default function Quotes() {
 
   // CRUD Handlers
   const loadQuoteDetails = async (quoteId: string) => {
-    const r = await fetch(`${API_BASE}/api/quotes/${quoteId}`, { credentials: 'include' });
+    if (!businessId) throw new Error('Negocio no seleccionado.');
+    const r = await fetch(`${API_BASE}/api/quotes/${quoteId}`, { credentials: 'include', headers: apiHeaders() });
     const data = await r.json().catch(() => null);
     if (!r.ok || !data?.success) throw new Error(data?.error || 'No se pudo cargar la cotización.');
     const q = data.quote || {};
@@ -184,7 +190,7 @@ export default function Quotes() {
       if (editingQuoteId) {
         const r = await fetch(`${API_BASE}/api/quotes/${editingQuoteId}`, {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...apiHeaders() },
           credentials: 'include',
           body: JSON.stringify(quoteData)
         });
@@ -193,7 +199,7 @@ export default function Quotes() {
       } else {
         const r = await fetch(`${API_BASE}/api/quotes`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...apiHeaders() },
           credentials: 'include',
           body: JSON.stringify(quoteData)
         });
@@ -213,7 +219,8 @@ export default function Quotes() {
       try {
         const r = await fetch(`${API_BASE}/api/quotes/${id}`, {
           method: 'DELETE',
-          credentials: 'include'
+          credentials: 'include',
+          headers: apiHeaders()
         });
         const data = await r.json().catch(() => null);
         if (!r.ok || !data?.success) throw new Error(data?.error || 'No se pudo eliminar la cotización.');
@@ -229,7 +236,7 @@ export default function Quotes() {
     try {
       const r = await fetch(`${API_BASE}/api/quotes/${id}/status`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...apiHeaders() },
         credentials: 'include',
         body: JSON.stringify({ status: newStatus })
       });
@@ -246,7 +253,7 @@ export default function Quotes() {
     try {
       const r = await fetch(`${API_BASE}/api/quotes/${id}/approval-link`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...apiHeaders() },
         credentials: 'include',
         body: JSON.stringify({})
       });
@@ -297,7 +304,7 @@ export default function Quotes() {
     try {
       const r = await fetch(`${API_BASE}/api/quotes/${quoteId}/verify`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...apiHeaders() },
         credentials: 'include',
         body: JSON.stringify({ verified })
       });

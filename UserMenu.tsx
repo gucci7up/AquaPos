@@ -1,21 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from './LanguageContext';
 import { account } from '@/lib/appwrite';
+import { useTenant } from './TenantContext';
 
 export default function UserMenu() {
   const { t } = useLanguage();
+  const { user, profile, business } = useTenant();
   const [isOpen, setIsOpen] = useState(false);
-  const [userName, setUserName] = useState('Administrador');
   const navigate = useNavigate();
-
-  useEffect(() => {
-    account.get().then(user => {
-      setUserName(user.name || user.email);
-    }).catch(() => {
-      // Not logged in or error
-    });
-  }, []);
+  const userName = user?.name || user?.email || 'Usuario';
+  const roleLabel = profile?.role || 'Usuario';
+  const businessName = business?.name || '';
 
   const handleLogout = async () => {
     try {
@@ -32,7 +28,7 @@ export default function UserMenu() {
       >
         <div className="text-right hidden sm:block">
           <p className="text-sm font-bold text-slate-900 leading-tight group-hover:text-primary transition-colors">{userName}</p>
-          <p className="text-xs text-slate-500 font-medium">Store Admin</p>
+          <p className="text-xs text-slate-500 font-medium">{businessName ? `${roleLabel} · ${businessName}` : roleLabel}</p>
         </div>
         <div className="size-10 rounded-full bg-primary/20 border-2 border-primary/30 overflow-hidden bg-cover bg-center transition-all group-hover:ring-2 ring-primary/50" style={{ backgroundImage: "url('https://lh3.googleusercontent.com/aida-public/AB6AXuBFwVRi_zYIrbyiw0EDgKmURSt4MhFc4OCjAq8aUMJk-naKkCBgsOjI-zA362lY-D-HCe79biMT4Nf7H-BbjeegGWEV8YpRgUvBIWoO1mQsgqu-tgc4PQFLez7RDNaMt0yUCcfZeD_btlkIHrosYYJqiH_2O9MrqSkMSKPI5rKCO1V8qLHRLZi_CcK-6QlfqLg8M83zaiZauYjNkPwUSDPmbZTD_MU_rMLIlJM-nPMWjhW_9NO0HGArMNt5IkfOXcM0z1XVIPA9wj4')" }}></div>
       </button>

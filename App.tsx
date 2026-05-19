@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { LanguageProvider, useLanguage } from './LanguageContext';
 import { BrandingProvider, useBranding } from './BrandingContext';
+import { TenantProvider, useTenant } from './TenantContext';
+import { account } from '@/lib/appwrite';
 import Dashboard from './views/Dashboard';
 import POS from './views/POS';
 import Inventory from './views/Inventory';
@@ -15,6 +17,7 @@ import Settings from './views/Settings';
 import Support from './views/Support';
 import Auth from './views/Auth';
 import QuoteApproval from './views/QuoteApproval';
+import AdminUsers from './views/AdminUsers';
 
 const SidebarLink = ({ to, icon, label, isNew = false, onClick }: { to: string; icon: string; label: string; isNew?: boolean; onClick?: () => void }) => {
   const location = useLocation();
@@ -59,6 +62,7 @@ const MobileNavItem = ({ to, icon, label, isActive }: { to: string; icon: string
 const Layout = ({ children }: { children?: React.ReactNode }) => {
   const { t } = useLanguage();
   const { branding } = useBranding();
+  const { isAdmin } = useTenant();
   const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -105,6 +109,7 @@ const Layout = ({ children }: { children?: React.ReactNode }) => {
         </nav>
 
         <div className="p-4 border-t border-slate-100 space-y-1">
+          {isAdmin && <SidebarLink to="/admin/users" icon="admin_panel_settings" label="Usuarios" />}
           <SidebarLink to="/settings" icon="settings" label={t('sidebar.settings')} />
           <SidebarLink to="/support" icon="help" label={t('sidebar.support')} />
         </div>
@@ -152,6 +157,7 @@ const Layout = ({ children }: { children?: React.ReactNode }) => {
                 <MenuGridItem to="/customers" icon="group" label="Clients" color="bg-blue-100 text-blue-600" onClick={() => setIsMobileMenuOpen(false)} />
                 <MenuGridItem to="/ai" icon="auto_awesome" label="AquaAI" color="bg-primary/20 text-primary" onClick={() => setIsMobileMenuOpen(false)} />
                 <MenuGridItem to="/quotes" icon="request_quote" label="Quotes" color="bg-purple-100 text-purple-600" onClick={() => setIsMobileMenuOpen(false)} />
+                {isAdmin && <MenuGridItem to="/admin/users" icon="admin_panel_settings" label="Usuarios" color="bg-slate-100 text-slate-600" onClick={() => setIsMobileMenuOpen(false)} />}
                 <MenuGridItem to="/settings" icon="settings" label="Settings" color="bg-slate-100 text-slate-600" onClick={() => setIsMobileMenuOpen(false)} />
                 <MenuGridItem to="/support" icon="help" label="Support" color="bg-amber-100 text-amber-600" onClick={() => setIsMobileMenuOpen(false)} />
               </div>
@@ -175,34 +181,69 @@ const MenuGridItem = ({ to, icon, label, color, onClick }: any) => {
   );
 }
 
+const RequireAuth = ({ children }: { children: React.ReactNode }) => {
+  const { loading, user, profile } = useTenant();
+  const location = useLocation();
+  const navigate = useNavigate();
+  if (loading) return null;
+  if (!user) return <Navigate to="/login" replace state={{ from: location.pathname }} />;
+  if (!profile) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
+        <div className="bg-white w-full max-w-lg rounded-2xl border border-slate-200 shadow-sm p-6">
+          <h2 className="text-lg font-bold text-slate-900">Usuario sin negocio asignado</h2>
+          <p className="text-sm text-slate-500 mt-2">
+            Tu usuario está creado, pero no tiene un negocio asignado todavía. Entra con el usuario Admin y asígnalo desde “Usuarios”.
+          </p>
+          <div className="mt-6 flex justify-end">
+            <button
+              onClick={async () => {
+                try { await account.deleteSession('current'); } catch { }
+                navigate('/login', { replace: true });
+              }}
+              className="px-4 py-2 bg-slate-900 text-white text-sm font-bold rounded-lg hover:bg-slate-800"
+            >
+              Cerrar sesión
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  return <>{children}</>;
+};
+
 export default function App() {
   return (
     <LanguageProvider>
-      <BrandingProvider>
-        <BrowserRouter>
-          <Routes>
-            <Route path="/" element={<Navigate to="/login" replace />} />
+      <TenantProvider>
+        <BrandingProvider>
+          <BrowserRouter>
+            <Routes>
+              <Route path="/" element={<Navigate to="/dashboard" replace />} />
 
-            {/* Auth Route - No Layout */}
-            <Route path="/login" element={<Auth />} />
-            <Route path="/quote/:quoteId/approve" element={<QuoteApproval />} />
-            <Route path="/q/:code" element={<QuoteApproval />} />
+              {/* Auth Route - No Layout */}
+              <Route path="/login" element={<Auth />} />
+              <Route path="/quote/:quoteId/approve" element={<QuoteApproval />} />
+              <Route path="/q/:code" element={<QuoteApproval />} />
 
-            {/* Application Routes - Wrapped in Layout */}
-            <Route path="/dashboard" element={<Layout><Dashboard /></Layout>} />
-            <Route path="/pos" element={<Layout><POS /></Layout>} />
-            <Route path="/inventory" element={<Layout><Inventory /></Layout>} />
-            <Route path="/suppliers" element={<Layout><Suppliers /></Layout>} />
-            <Route path="/sales" element={<Layout><Sales /></Layout>} />
-            <Route path="/quotes" element={<Layout><Quotes /></Layout>} />
-            <Route path="/finance" element={<Layout><Finance /></Layout>} />
-            <Route path="/customers" element={<Layout><Customers /></Layout>} />
-            <Route path="/ai" element={<Layout><AquaAI /></Layout>} />
-            <Route path="/settings" element={<Layout><Settings /></Layout>} />
-            <Route path="/support" element={<Layout><Support /></Layout>} />
-          </Routes>
-        </BrowserRouter>
-      </BrandingProvider>
+              {/* Application Routes - Wrapped in Layout */}
+              <Route path="/dashboard" element={<RequireAuth><Layout><Dashboard /></Layout></RequireAuth>} />
+              <Route path="/pos" element={<RequireAuth><Layout><POS /></Layout></RequireAuth>} />
+              <Route path="/inventory" element={<RequireAuth><Layout><Inventory /></Layout></RequireAuth>} />
+              <Route path="/suppliers" element={<RequireAuth><Layout><Suppliers /></Layout></RequireAuth>} />
+              <Route path="/sales" element={<RequireAuth><Layout><Sales /></Layout></RequireAuth>} />
+              <Route path="/quotes" element={<RequireAuth><Layout><Quotes /></Layout></RequireAuth>} />
+              <Route path="/finance" element={<RequireAuth><Layout><Finance /></Layout></RequireAuth>} />
+              <Route path="/customers" element={<RequireAuth><Layout><Customers /></Layout></RequireAuth>} />
+              <Route path="/ai" element={<RequireAuth><Layout><AquaAI /></Layout></RequireAuth>} />
+              <Route path="/settings" element={<RequireAuth><Layout><Settings /></Layout></RequireAuth>} />
+              <Route path="/support" element={<RequireAuth><Layout><Support /></Layout></RequireAuth>} />
+              <Route path="/admin/users" element={<RequireAuth><Layout><AdminUsers /></Layout></RequireAuth>} />
+            </Routes>
+          </BrowserRouter>
+        </BrandingProvider>
+      </TenantProvider>
     </LanguageProvider>
   );
 }

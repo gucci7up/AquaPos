@@ -3,6 +3,7 @@ import { useLanguage } from '../LanguageContext';
 import UserMenu from '../UserMenu';
 import { databases } from '../lib/appwrite';
 import { Query } from 'appwrite';
+import { useTenant } from '../TenantContext';
 
 // ─── Appwrite Config ────────────────────────────────────────────────────────
 const DB_ID = import.meta.env.VITE_APPWRITE_DATABASE_ID;
@@ -315,6 +316,7 @@ function AlertRow({
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function AquaAI() {
   const { t, language } = useLanguage();
+  const { businessId } = useTenant();
   const isEs = language === 'es';
 
   // Data
@@ -329,20 +331,20 @@ export default function AquaAI() {
 
   // Fetch all data on mount
   useEffect(() => {
-    if (!DB_ID) { setLoading(false); return; }
+    if (!DB_ID || !businessId) { setLoading(false); return; }
     Promise.all([
-      fetchAll(DB_ID, COL_SALES),
-      fetchAll(DB_ID, COL_INVENTORY),
-      fetchAll(DB_ID, COL_CUSTOMERS),
-      fetchAll(DB_ID, COL_PAYMENTS),
-      fetchAll(DB_ID, COL_SUPPLIERS),
-      fetchAll(DB_ID, COL_ORDERS),
-      fetchAll(DB_ID, COL_QUOTES),
+      fetchAll(DB_ID, COL_SALES, [Query.equal('businessId', businessId)]),
+      fetchAll(DB_ID, COL_INVENTORY, [Query.equal('businessId', businessId)]),
+      fetchAll(DB_ID, COL_CUSTOMERS, [Query.equal('businessId', businessId)]),
+      fetchAll(DB_ID, COL_PAYMENTS, [Query.equal('businessId', businessId)]),
+      fetchAll(DB_ID, COL_SUPPLIERS, [Query.equal('businessId', businessId)]),
+      fetchAll(DB_ID, COL_ORDERS, [Query.equal('businessId', businessId)]),
+      fetchAll(DB_ID, COL_QUOTES, [Query.equal('businessId', businessId)]),
     ]).then(([sales, inventory, customers, payments, suppliers, orders, quotes]) => {
       setData({ sales, inventory, customers, payments, suppliers, orders, quotes });
       setLoading(false);
     }).catch(() => setLoading(false));
-  }, []);
+  }, [businessId]);
 
   // Scroll to bottom
   useEffect(() => {

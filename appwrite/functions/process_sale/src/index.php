@@ -35,6 +35,7 @@ return function ($context, $res_legacy = null) {
     if (!$payload || !isset($payload['items']) || !isset($payload['total'])) {
         return $res->json(['success' => false, 'error' => 'Missing payload data (items/total)'], 400);
     }
+    $businessId = $payload['businessId'] ?? null;
 
     // 4. Get Variables
     $vars = $is_modern ? ($context->variables ?? $_ENV) : ($req['variables'] ?? $_ENV);
@@ -69,6 +70,7 @@ return function ($context, $res_legacy = null) {
             $salesCollectionId,
             ID::unique(),
             [
+                'businessId' => $businessId,
                 'customerId' => $payload['customerId'] ?? null,
                 'items' => json_encode($payload['items']),
                 'total' => (float) $payload['total'],
@@ -85,6 +87,9 @@ return function ($context, $res_legacy = null) {
             $qty = (int) $item['quantity'];
             try {
                 $product = $databases->getDocument($databaseId, $inventoryCollectionId, $productId);
+                if ($businessId && isset($product['businessId']) && $product['businessId'] !== $businessId) {
+                    continue;
+                }
                 $newStock = max(0, (int) $product['stock'] - $qty);
                 $databases->updateDocument($databaseId, $inventoryCollectionId, $productId, ['stock' => $newStock]);
                 $log("Stock updated for $productId: $newStock");
