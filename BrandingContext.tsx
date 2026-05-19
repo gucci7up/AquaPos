@@ -67,16 +67,20 @@ export const BrandingProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const { businessId } = useTenant();
 
     const loadBranding = async () => {
-        if (!DB || !businessId) {
-            setBranding(defaults);
-            document.documentElement.style.setProperty('--color-primary', defaults.primaryColor);
-            return;
+        if (!DB) return;
+        let effectiveBusinessId = businessId || null;
+        if (!effectiveBusinessId) {
+            try {
+                effectiveBusinessId = localStorage.getItem('aquapos:lastBusinessId');
+            } catch { }
         }
         try {
-            const res = await databases.listDocuments(DB, COL, [
-                Query.equal('businessId', businessId),
-                Query.limit(1),
-            ]);
+            const res = effectiveBusinessId
+                ? await databases.listDocuments(DB, COL, [
+                    Query.equal('businessId', effectiveBusinessId),
+                    Query.limit(1),
+                ])
+                : await databases.listDocuments(DB, COL, [Query.limit(1)]);
             if (!res.documents.length) return;
             const d = res.documents[0];
 
@@ -99,7 +103,6 @@ export const BrandingProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
             setBranding(config);
 
-            // Apply primaryColor as CSS variable so Tailwind `primary` classes update globally
             document.documentElement.style.setProperty('--color-primary', config.primaryColor);
 
         } catch (e) {

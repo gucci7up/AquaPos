@@ -117,6 +117,14 @@ export const TenantProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     load();
   }, []);
 
+  useEffect(() => {
+    const id = profile?.businessId;
+    if (!id) return;
+    try {
+      localStorage.setItem('aquapos:lastBusinessId', id);
+    } catch { }
+  }, [profile?.businessId]);
+
   const value = useMemo<TenantContextValue>(() => {
     const businessId = profile?.businessId || null;
     const role = profile?.role || null;
