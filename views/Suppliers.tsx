@@ -10,6 +10,7 @@ const COLLECTION_INVENTORY_ID = import.meta.env.VITE_APPWRITE_COLLECTION_INVENTO
 const COLLECTION_SUPPLIERS_ID = import.meta.env.VITE_APPWRITE_COLLECTION_SUPPLIERS_ID || 'suppliers';
 const COLLECTION_ORDERS_ID = import.meta.env.VITE_APPWRITE_COLLECTION_ORDERS_ID || 'orders';
 const COLLECTION_SETTINGS_ID = import.meta.env.VITE_APPWRITE_COLLECTION_SETTINGS_ID || 'settings';
+const COLLECTION_SUPPLIER_CATEGORIES_ID = import.meta.env.VITE_APPWRITE_COLLECTION_SUPPLIER_CATEGORIES_ID || 'supplier_categories';
 const FUNCTION_RECEIVE_STOCK_ID = import.meta.env.VITE_APPWRITE_FUNCTION_RECEIVE_STOCK_ID;
 
 // Fallback mock items removed for Appwrite integration
@@ -29,6 +30,11 @@ export default function Suppliers() {
     const [products, setProducts] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [businessSettings, setBusinessSettings] = useState<any>(null);
+    const [supplierCategories, setSupplierCategories] = useState<Array<{ id: string; name: string }>>([]);
+    const [isSupplierCategoriesOpen, setIsSupplierCategoriesOpen] = useState(false);
+    const [newSupplierCategoryName, setNewSupplierCategoryName] = useState('');
+    const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
+    const [editingCategoryName, setEditingCategoryName] = useState('');
 
     // Printing state
     const [activeOrderForPrint, setActiveOrderForPrint] = useState<any>(null);
@@ -36,7 +42,23 @@ export default function Suppliers() {
     useEffect(() => {
         fetchInitialData();
         fetchBusinessSettings();
+        fetchSupplierCategories();
     }, [businessId]);
+
+    const fetchSupplierCategories = async () => {
+        if (!DATABASE_ID || !COLLECTION_SUPPLIER_CATEGORIES_ID || !businessId) return;
+        try {
+            const res = await databases.listDocuments(DATABASE_ID, COLLECTION_SUPPLIER_CATEGORIES_ID, [
+                Query.equal('businessId', businessId),
+                Query.orderAsc('name'),
+                Query.limit(200),
+            ]);
+            const list = (res.documents || []).map((d: any) => ({ id: d.$id, name: d.name }));
+            setSupplierCategories(list);
+        } catch (e) {
+            setSupplierCategories([]);
+        }
+    };
 
     const fetchBusinessSettings = async () => {
         if (!DATABASE_ID || !COLLECTION_SETTINGS_ID || !businessId) return;
@@ -134,6 +156,77 @@ export default function Suppliers() {
         } catch (error: any) {
             console.error('Error saving supplier:', error);
             alert('Failed to save supplier: ' + (error.message || 'Check console'));
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const createSupplierCategory = async () => {
+        const name = newSupplierCategoryName.trim();
+        if (!name || !DATABASE_ID || !COLLECTION_SUPPLIER_CATEGORIES_ID || !businessId) return;
+        setLoading(true);
+        try {
+            await databases.createDocument(DATABASE_ID, COLLECTION_SUPPLIER_CATEGORIES_ID, ID.unique(), { name, businessId });
+            setNewSupplierCategoryName('');
+            await fetchSupplierCategories();
+        } catch (e: any) {
+            alert('Error creando categoría: ' + (e?.message || e));
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const startEditCategory = (cat: { id: string; name: string }) => {
+        setEditingCategoryId(cat.id);
+        setEditingCategoryName(cat.name);
+    };
+
+    const saveEditCategory = async () => {
+        const name = editingCategoryName.trim();
+        if (!editingCategoryId || !name || !DATABASE_ID || !COLLECTION_SUPPLIER_CATEGORIES_ID || !businessId) return;
+        const old = supplierCategories.find(c => c.id === editingCategoryId)?.name || '';
+        setLoading(true);
+        try {
+            await databases.updateDocument(DATABASE_ID, COLLECTION_SUPPLIER_CATEGORIES_ID, editingCategoryId, { name, businessId });
+            if (old && old !== name) {
+                const affected = suppliers.filter(s => String(s.category || '') === old);
+                for (const s of affected) {
+                    try {
+                        await databases.updateDocument(DATABASE_ID, COLLECTION_SUPPLIERS_ID, String(s.id), { category: name, businessId });
+                    } catch { }
+                }
+                if (affected.length) {
+                    setSuppliers(prev => prev.map(s => (String(s.category || '') === old ? { ...s, category: name } : s)));
+                }
+            }
+            setEditingCategoryId(null);
+            setEditingCategoryName('');
+            await fetchSupplierCategories();
+        } catch (e: any) {
+            alert('Error actualizando categoría: ' + (e?.message || e));
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const deleteCategory = async (cat: { id: string; name: string }) => {
+        if (!DATABASE_ID || !COLLECTION_SUPPLIER_CATEGORIES_ID || !businessId) return;
+        if (!window.confirm(`Eliminar categoría "${cat.name}"?`)) return;
+        setLoading(true);
+        try {
+            await databases.deleteDocument(DATABASE_ID, COLLECTION_SUPPLIER_CATEGORIES_ID, cat.id);
+            const affected = suppliers.filter(s => String(s.category || '') === cat.name);
+            for (const s of affected) {
+                try {
+                    await databases.updateDocument(DATABASE_ID, COLLECTION_SUPPLIERS_ID, String(s.id), { category: 'General', businessId });
+                } catch { }
+            }
+            if (affected.length) {
+                setSuppliers(prev => prev.map(s => (String(s.category || '') === cat.name ? { ...s, category: 'General' } : s)));
+            }
+            await fetchSupplierCategories();
+        } catch (e: any) {
+            alert('Error eliminando categoría: ' + (e?.message || e));
         } finally {
             setLoading(false);
         }
@@ -370,6 +463,15 @@ export default function Suppliers() {
                                 {t('suppliers.tabSuppliers')}
                             </button>
                         </div>
+                        {activeTab === 'suppliers' && (
+                            <button
+                                onClick={() => setIsSupplierCategoriesOpen(true)}
+                                className="px-5 py-2 bg-white border border-slate-200 text-slate-800 rounded-xl text-sm font-bold shadow-sm hover:bg-slate-50 transition-all flex items-center gap-2 active:scale-95"
+                            >
+                                <span className="material-symbols-outlined text-lg">category</span>
+                                Categorías
+                            </button>
+                        )}
                         <button
                             onClick={() => activeTab === 'suppliers' ? openSupplierModal() : openOrderModal()}
                             className="px-5 py-2 bg-slate-900 text-white rounded-xl text-sm font-bold shadow-lg hover:brightness-110 transition-all flex items-center gap-2 active:scale-95"
@@ -663,12 +765,100 @@ export default function Suppliers() {
                                 <label className="text-xs font-bold text-slate-500 uppercase">Category</label>
                                 <select className="w-full bg-slate-50 border border-slate-200 p-3 rounded-lg outline-none focus:border-primary"
                                     value={supplierForm.category} onChange={e => setSupplierForm({ ...supplierForm, category: e.target.value })}>
-                                    <option>Apparel</option><option>Grocery</option><option>Electronics</option><option>General</option>
+                                    {Array.from(new Set(['General', ...supplierCategories.map(c => c.name), supplierForm.category].filter(Boolean))).map((c) => (
+                                        <option key={c} value={c}>{c}</option>
+                                    ))}
                                 </select>
                             </div>
                             <button onClick={handleSaveSupplier} className="w-full py-3 bg-primary text-white font-bold rounded-xl mt-4 hover:brightness-105 shadow-lg">
                                 Save Supplier
                             </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {isSupplierCategoriesOpen && (
+                <div className="absolute inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+                    <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
+                        <div className="p-6 border-b border-slate-100 flex justify-between items-center">
+                            <div>
+                                <h3 className="text-xl font-black text-slate-900">Categorías de Proveedores</h3>
+                                <p className="text-xs text-slate-500">Crea, edita y elimina categorías para clasificar proveedores.</p>
+                            </div>
+                            <button onClick={() => setIsSupplierCategoriesOpen(false)} className="text-slate-400 hover:text-slate-600">
+                                <span className="material-symbols-outlined">close</span>
+                            </button>
+                        </div>
+
+                        <div className="p-6 space-y-4">
+                            <div className="flex gap-2">
+                                <input
+                                    value={newSupplierCategoryName}
+                                    onChange={(e) => setNewSupplierCategoryName(e.target.value)}
+                                    className="flex-1 bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm outline-none focus:border-primary"
+                                    placeholder="Nueva categoría (ej: Ferretería)"
+                                />
+                                <button
+                                    onClick={createSupplierCategory}
+                                    disabled={loading || !newSupplierCategoryName.trim()}
+                                    className="px-4 py-3 bg-primary text-white font-bold rounded-lg hover:brightness-105 disabled:opacity-60"
+                                >
+                                    Crear
+                                </button>
+                            </div>
+
+                            <div className="space-y-2 max-h-[55vh] overflow-y-auto">
+                                {supplierCategories.map(cat => (
+                                    <div key={cat.id} className="flex items-center gap-2 p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                                        {editingCategoryId === cat.id ? (
+                                            <>
+                                                <input
+                                                    value={editingCategoryName}
+                                                    onChange={(e) => setEditingCategoryName(e.target.value)}
+                                                    className="flex-1 bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-primary"
+                                                />
+                                                <button
+                                                    onClick={saveEditCategory}
+                                                    disabled={loading || !editingCategoryName.trim()}
+                                                    className="px-3 py-2 bg-slate-900 text-white text-sm font-bold rounded-lg hover:bg-slate-800 disabled:opacity-60"
+                                                >
+                                                    Guardar
+                                                </button>
+                                                <button
+                                                    onClick={() => { setEditingCategoryId(null); setEditingCategoryName(''); }}
+                                                    className="px-3 py-2 border border-slate-200 bg-white text-slate-700 text-sm font-bold rounded-lg hover:bg-slate-50"
+                                                >
+                                                    Cancelar
+                                                </button>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <div className="flex-1">
+                                                    <p className="text-sm font-bold text-slate-900">{cat.name}</p>
+                                                </div>
+                                                <button
+                                                    onClick={() => startEditCategory(cat)}
+                                                    className="p-2 hover:bg-white rounded-lg text-blue-600"
+                                                    title="Editar"
+                                                >
+                                                    <span className="material-symbols-outlined">edit</span>
+                                                </button>
+                                                <button
+                                                    onClick={() => deleteCategory(cat)}
+                                                    className="p-2 hover:bg-white rounded-lg text-red-500"
+                                                    title="Eliminar"
+                                                >
+                                                    <span className="material-symbols-outlined">delete</span>
+                                                </button>
+                                            </>
+                                        )}
+                                    </div>
+                                ))}
+                                {supplierCategories.length === 0 && (
+                                    <div className="text-sm text-slate-500">No hay categorías todavía.</div>
+                                )}
+                            </div>
                         </div>
                     </div>
                 </div>
