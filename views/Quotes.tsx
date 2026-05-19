@@ -1,16 +1,16 @@
 import React, { useState, useMemo } from 'react';
 import { useLanguage } from '../LanguageContext';
 import UserMenu from '../UserMenu';
-import { databases, functions, Query, ID } from '@/lib/appwrite';
+import { databases, Query } from '@/lib/appwrite';
 import { PrintTemplates } from '../components/PrintTemplates';
 
 const DATABASE_ID = import.meta.env.VITE_APPWRITE_DATABASE_ID;
 const COLLECTION_ID = import.meta.env.VITE_APPWRITE_COLLECTION_QUOTES_ID || 'quotes';
 const COLLECTION_SETTINGS_ID = import.meta.env.VITE_APPWRITE_COLLECTION_SETTINGS_ID || 'settings';
-const FUNCTION_QUOTE_APPROVAL_ID = import.meta.env.VITE_APPWRITE_FUNCTION_QUOTE_APPROVAL_ID;
 const ENDPOINT = import.meta.env.VITE_APPWRITE_ENDPOINT;
 const PROJECT_ID = import.meta.env.VITE_APPWRITE_PROJECT_ID;
 const BUCKET_ID = import.meta.env.VITE_APPWRITE_BUCKET_IMAGES_ID || 'products';
+const API_BASE = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
 
 // Mock Data removed
 const initialQuotes: any[] = [];
@@ -32,17 +32,28 @@ export default function Quotes() {
   }, []);
 
   const fetchQuotes = async () => {
-    if (!DATABASE_ID || !COLLECTION_ID) return;
     try {
       setLoading(true);
-      const response = await databases.listDocuments(DATABASE_ID, COLLECTION_ID, [
-        Query.orderDesc('$createdAt')
-      ]);
-      setQuotes(response.documents.map(doc => ({
-        ...doc,
-        id: doc.$id,
-        items: typeof doc.items === 'string' ? JSON.parse(doc.items) : doc.items
-      })));
+      const r = await fetch(`${API_BASE}/api/quotes`, { credentials: 'include' });
+      const data = await r.json().catch(() => null);
+      if (!r.ok || !data?.success) throw new Error(data?.error || 'No se pudieron cargar las cotizaciones.');
+      const mapped = (data.quotes || []).map((row: any) => ({
+        id: String(row.id),
+        customerName: row.customer_name,
+        customer: row.customer_name,
+        taxId: row.tax_id,
+        expiry: row.expiry_date,
+        subtotal: Number(row.subtotal) || 0,
+        total: Number(row.total) || 0,
+        status: row.status,
+        approvalStatus: row.approval_status,
+        approvalName: row.approver_name,
+        approvalAt: row.approved_at,
+        items: [],
+        date: row.created_at,
+        $createdAt: row.created_at
+      }));
+      setQuotes(mapped);
     } catch (error) {
       console.error('Error fetching quotes:', error);
     } finally {
@@ -97,15 +108,56 @@ export default function Quotes() {
   };
 
   // CRUD Handlers
-  const handleOpenModal = (quote: any = null) => {
+  const loadQuoteDetails = async (quoteId: string) => {
+    const r = await fetch(`${API_BASE}/api/quotes/${quoteId}`, { credentials: 'include' });
+    const data = await r.json().catch(() => null);
+    if (!r.ok || !data?.success) throw new Error(data?.error || 'No se pudo cargar la cotización.');
+    const q = data.quote || {};
+    const items = (data.items || []).map((it: any) => ({
+      id: it.id || Date.now(),
+      desc: it.description,
+      qty: Number(it.qty) || 0,
+      price: Number(it.price) || 0,
+    }));
+    return {
+      id: String(q.id),
+      customerName: q.customer_name,
+      customer: q.customer_name,
+      taxId: q.tax_id,
+      expiry: q.expiry_date,
+      subtotal: Number(q.subtotal) || 0,
+      total: Number(q.total) || 0,
+      status: q.status,
+      approvalStatus: q.approval_status,
+      approvalName: q.approver_name,
+      approvalAt: q.approved_at,
+      signatureDataUrl: q.signature_data,
+      idDocDataUrl: q.id_doc_data,
+      idDocFilename: q.id_doc_filename,
+      items,
+      date: q.created_at,
+      $createdAt: q.created_at
+    };
+  };
+
+  const handleOpenModal = async (quote: any = null) => {
     if (quote) {
-      setEditingQuoteId(quote.id);
-      setFormData({
-        customer: quote.customer,
-        taxId: quote.taxId,
-        expiry: quote.expiry,
-        items: [...quote.items]
-      });
+      setWorkingQuoteId(quote.id);
+      try {
+        const full = await loadQuoteDetails(quote.id);
+        setEditingQuoteId(full.id);
+        setFormData({
+          customer: full.customer,
+          taxId: full.taxId,
+          expiry: full.expiry,
+          items: [...full.items]
+        });
+      } catch (e: any) {
+        alert('Error: ' + (e?.message || 'No se pudo cargar la cotización.'));
+        return;
+      } finally {
+        setWorkingQuoteId(null);
+      }
     } else {
       setEditingQuoteId(null);
       setFormData({
@@ -119,13 +171,6 @@ export default function Quotes() {
   };
 
   const handleSaveQuote = async () => {
-    if (!DATABASE_ID || !COLLECTION_ID) {
-      // alert no longer needed with fallbacks
-      return;
-    }
-
-    // items must be stringified for Appwrite
-    const itemsJson = JSON.stringify(formData.items);
     const subtotal = calculateTotal(formData.items);
     const total = subtotal; // Sin impuestos en cotizaciones
 
@@ -133,42 +178,53 @@ export default function Quotes() {
       customerName: formData.customer || 'Cliente General',
       taxId: formData.taxId,
       expiry: formData.expiry,
-      items: itemsJson,
-      subtotal: subtotal,
-      tax: 0,
-      taxRate: 0,
-      total: total,
-      status: editingQuoteId ? quotes.find(q => q.id === editingQuoteId)?.status : 'Draft'
+      items: formData.items.map(it => ({
+        desc: it.desc,
+        qty: Number(it.qty) || 0,
+        price: Number(it.price) || 0
+      })),
+      subtotal,
+      total,
+      status: editingQuoteId ? (quotes.find(q => q.id === editingQuoteId)?.status || 'Draft') : 'Draft'
     };
-
-    console.log('Quotes - Saving document:', quoteData);
 
     try {
       if (editingQuoteId) {
-        await databases.updateDocument(DATABASE_ID, COLLECTION_ID, editingQuoteId, quoteData);
-      } else {
-        await databases.createDocument(DATABASE_ID, COLLECTION_ID, ID.unique(), {
-          ...quoteData,
-          date: new Date().toISOString()
+        const r = await fetch(`${API_BASE}/api/quotes/${editingQuoteId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(quoteData)
         });
+        const data = await r.json().catch(() => null);
+        if (!r.ok || !data?.success) throw new Error(data?.error || 'No se pudo actualizar la cotización.');
+      } else {
+        const r = await fetch(`${API_BASE}/api/quotes`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(quoteData)
+        });
+        const data = await r.json().catch(() => null);
+        if (!r.ok || !data?.success) throw new Error(data?.error || 'No se pudo crear la cotización.');
       }
       fetchQuotes();
       setIsModalOpen(false);
     } catch (error: any) {
       console.error('Error saving quote:', error);
-      alert(
-        'Error al guardar la cotización: ' +
-        (error.message || 'Error desconocido') +
-        `\n\nDB: ${DATABASE_ID}\nCollection: ${COLLECTION_ID}\nEndpoint: ${ENDPOINT || 'N/A'}`
-      );
+      alert('Error al guardar la cotización: ' + (error.message || 'Error desconocido'));
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (!DATABASE_ID || !COLLECTION_ID) return;
     if (confirm('Are you sure you want to delete this quote?')) {
       try {
-        await databases.deleteDocument(DATABASE_ID, COLLECTION_ID, id);
+        const r = await fetch(`${API_BASE}/api/quotes/${id}`, {
+          method: 'DELETE',
+          credentials: 'include'
+        });
+        const data = await r.json().catch(() => null);
+        if (!r.ok || !data?.success) throw new Error(data?.error || 'No se pudo eliminar la cotización.');
         fetchQuotes();
       } catch (error) {
         console.error('Error deleting quote:', error);
@@ -178,9 +234,15 @@ export default function Quotes() {
   };
 
   const handleStatusChange = async (id: string, newStatus: string) => {
-    if (!DATABASE_ID || !COLLECTION_ID) return;
     try {
-      await databases.updateDocument(DATABASE_ID, COLLECTION_ID, id, { status: newStatus });
+      const r = await fetch(`${API_BASE}/api/quotes/${id}/status`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ status: newStatus })
+      });
+      const data = await r.json().catch(() => null);
+      if (!r.ok || !data?.success) throw new Error(data?.error || 'No se pudo actualizar el estado.');
       fetchQuotes();
     } catch (error) {
       console.error('Error updating status:', error);
@@ -188,31 +250,16 @@ export default function Quotes() {
   };
 
   const handleGenerateApprovalLink = async (id: string) => {
-    if (!FUNCTION_QUOTE_APPROVAL_ID) {
-      alert('Función de aprobación no configurada.');
-      return;
-    }
     setWorkingQuoteId(id);
     try {
-      const execution = await functions.createExecution(
-        FUNCTION_QUOTE_APPROVAL_ID,
-        JSON.stringify({ action: 'createLink', quoteId: id })
-      );
-      const raw = execution.responseBody || '';
-      let response: any = null;
-      try { response = JSON.parse(raw); } catch { response = null; }
-      if (!response?.success || !response?.token) {
-        const status = (execution as any).status ?? 'unknown';
-        const code = (execution as any).responseStatusCode ?? 'unknown';
-        const execId = (execution as any).$id ?? '';
-        throw new Error(
-          (response?.error || raw || 'No se pudo generar el link.') +
-          `\n\nFunction: ${FUNCTION_QUOTE_APPROVAL_ID}` +
-          `\nExecution: ${execId}` +
-          `\nStatus: ${status}` +
-          `\nHTTP: ${code}`
-        );
-      }
+      const r = await fetch(`${API_BASE}/api/quotes/${id}/approval-link`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({})
+      });
+      const response = await r.json().catch(() => null);
+      if (!r.ok || !response?.success || !response?.token) throw new Error(response?.error || 'No se pudo generar el link.');
       const link = `${window.location.origin}/quote/${id}/approve?token=${response.token}`;
       try {
         await navigator.clipboard.writeText(link);
@@ -238,18 +285,29 @@ export default function Quotes() {
     return `${ENDPOINT}/storage/buckets/${BUCKET_ID}/files/${fileId}/view?project=${PROJECT_ID}`;
   };
 
-  const openVerify = (quote: any) => {
-    setVerifyQuote(quote);
+  const openVerify = async (quote: any) => {
+    setWorkingQuoteId(quote.id);
+    try {
+      const full = await loadQuoteDetails(quote.id);
+      setVerifyQuote(full);
+    } catch (e: any) {
+      alert('Error: ' + (e?.message || 'No se pudo cargar la verificación.'));
+    } finally {
+      setWorkingQuoteId(null);
+    }
   };
 
   const handleSetVerification = async (quoteId: string, verified: boolean) => {
-    if (!DATABASE_ID || !COLLECTION_ID) return;
     setWorkingQuoteId(quoteId);
     try {
-      await databases.updateDocument(DATABASE_ID, COLLECTION_ID, quoteId, {
-        approvalStatus: verified ? 'Verified' : 'Rejected',
-        status: verified ? 'Approved' : 'Rejected'
+      const r = await fetch(`${API_BASE}/api/quotes/${quoteId}/verify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ verified })
       });
+      const data = await r.json().catch(() => null);
+      if (!r.ok || !data?.success) throw new Error(data?.error || 'No se pudo actualizar la verificación.');
       setVerifyQuote(null);
       fetchQuotes();
     } catch (e: any) {
@@ -260,19 +318,21 @@ export default function Quotes() {
   };
 
   const handlePrint = (quote: any) => {
-    setActiveQuoteForPrint({
-      ...quote,
-      // Ensure items is an object for PrintTemplates
-      items: typeof quote.items === 'string' ? JSON.parse(quote.items) : quote.items
-    });
+    const run = async () => {
+      setWorkingQuoteId(quote.id);
+      try {
+        const full = quote.items && quote.items.length ? quote : await loadQuoteDetails(quote.id);
+        setActiveQuoteForPrint({
+          ...full,
+          items: full.items || []
+        });
+        setTimeout(() => {
+          const printContents = document.getElementById('print-container')?.innerHTML;
+          if (!printContents) return;
 
-    setTimeout(() => {
-      const printContents = document.getElementById('print-container')?.innerHTML;
-      if (!printContents) return;
-
-      const printWindow = window.open('', '_blank', 'width=900,height=700');
-      if (printWindow) {
-        printWindow.document.write(`
+          const printWindow = window.open('', '_blank', 'width=900,height=700');
+          if (printWindow) {
+            printWindow.document.write(`
           <html>
             <head>
               <title>Print Quote - ${quote.id}</title>
@@ -292,9 +352,16 @@ export default function Quotes() {
             </body>
           </html>
         `);
-        printWindow.document.close();
+            printWindow.document.close();
+          }
+        }, 100);
+      } catch (e: any) {
+        alert('Error: ' + (e?.message || 'No se pudo imprimir la cotización.'));
+      } finally {
+        setWorkingQuoteId(null);
       }
-    }, 100);
+    };
+    run();
   };
 
   // Modal Form Handlers
@@ -496,9 +563,9 @@ export default function Quotes() {
                     <p className="text-sm font-bold text-slate-900">Firma digital</p>
                   </div>
                   <div className="p-4">
-                    {verifyQuote.signatureFileId ? (
+                    {verifyQuote.signatureDataUrl ? (
                       <img
-                        src={buildFilePreviewUrl(verifyQuote.signatureFileId, 900)}
+                        src={verifyQuote.signatureDataUrl}
                         alt="Firma"
                         className="w-full rounded-xl border border-slate-200"
                       />
@@ -513,15 +580,15 @@ export default function Quotes() {
                     <p className="text-sm font-bold text-slate-900">Documento de identidad</p>
                   </div>
                   <div className="p-4">
-                    {verifyQuote.idDocFileId ? (
+                    {verifyQuote.idDocDataUrl ? (
                       <a
-                        href={buildFileViewUrl(verifyQuote.idDocFileId)}
+                        href={verifyQuote.idDocDataUrl}
                         target="_blank"
                         rel="noreferrer"
                         className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-200 font-bold text-slate-700 hover:bg-slate-50"
                       >
                         <span className="material-symbols-outlined">visibility</span>
-                        Ver documento
+                        Ver documento{verifyQuote.idDocFilename ? ` (${verifyQuote.idDocFilename})` : ''}
                       </a>
                     ) : (
                       <p className="text-sm text-slate-500">No hay documento cargado.</p>

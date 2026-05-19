@@ -1,9 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { useLanguage } from '../LanguageContext';
-import { functions } from '@/lib/appwrite';
-
-const FUNCTION_QUOTE_APPROVAL_ID = import.meta.env.VITE_APPWRITE_FUNCTION_QUOTE_APPROVAL_ID;
+const API_BASE = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
 
 type QuotePublic = {
   id: string;
@@ -83,11 +81,6 @@ export default function QuoteApproval() {
 
   useEffect(() => {
     const load = async () => {
-      if (!FUNCTION_QUOTE_APPROVAL_ID) {
-        setError('Función de aprobación no configurada.');
-        setLoading(false);
-        return;
-      }
       if (!quoteId || !token) {
         setError('Link inválido o incompleto.');
         setLoading(false);
@@ -97,25 +90,26 @@ export default function QuoteApproval() {
       setLoading(true);
       setError(null);
       try {
-        const execution = await functions.createExecution(
-          FUNCTION_QUOTE_APPROVAL_ID,
-          JSON.stringify({ action: 'get', quoteId, token })
-        );
-        const raw = execution.responseBody || '';
-        let response: any = null;
-        try { response = JSON.parse(raw); } catch { response = null; }
-        if (!response?.success) {
-          const status = (execution as any).status ?? 'unknown';
-          const code = (execution as any).responseStatusCode ?? 'unknown';
-          const execId = (execution as any).$id ?? '';
-          throw new Error(
-            (response?.error || raw || 'No se pudo cargar la cotización.') +
-            `\n\nExecution: ${execId}` +
-            `\nStatus: ${status}` +
-            `\nHTTP: ${code}`
-          );
-        }
-        setQuote(response.quote);
+        const r = await fetch(`${API_BASE}/public/quotes/${quoteId}?token=${encodeURIComponent(token)}`);
+        const response = await r.json().catch(() => null);
+        if (!r.ok || !response?.success) throw new Error(response?.error || 'No se pudo cargar la cotización.');
+        const q = response.quote || {};
+        const items = (q.items || []).map((it: any) => ({
+          desc: it.description,
+          qty: Number(it.qty) || 0,
+          price: Number(it.price) || 0,
+        }));
+        setQuote({
+          id: String(q.id),
+          customerName: q.customer_name || q.customerName,
+          taxId: q.tax_id || q.taxId,
+          expiry: q.expiry_date || q.expiry,
+          items,
+          subtotal: Number(q.subtotal) || 0,
+          total: Number(q.total) || 0,
+          status: q.status,
+          approvalStatus: q.approval_status || q.approvalStatus,
+        });
       } catch (e: any) {
         setError(e?.message || 'Error cargando cotización.');
       } finally {
@@ -166,15 +160,13 @@ export default function QuoteApproval() {
     return false;
   };
 
-  const readFileBase64 = (file: File) =>
+  const readFileDataUrl = (file: File) =>
     new Promise<string>((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => {
         const result = reader.result;
         if (typeof result !== 'string') return reject(new Error('No se pudo leer el archivo.'));
-        const parts = result.split('base64,');
-        if (parts.length < 2) return reject(new Error('Formato base64 inválido.'));
-        resolve(parts[1]);
+        resolve(result);
       };
       reader.onerror = () => reject(new Error('No se pudo leer el archivo.'));
       reader.readAsDataURL(file);
@@ -186,15 +178,14 @@ export default function QuoteApproval() {
     setIdDocPreviewName(file ? file.name : null);
     if (!file) return;
     try {
-      const base64 = await readFileBase64(file);
-      setIdDocBase64(base64);
+      const dataUrl = await readFileDataUrl(file);
+      setIdDocBase64(dataUrl);
     } catch (e: any) {
       setError(e?.message || 'Error leyendo documento.');
     }
   };
 
   const handleSubmit = async () => {
-    if (!FUNCTION_QUOTE_APPROVAL_ID) return;
     if (!quoteId || !token) return;
     if (!idDocFile || !idDocBase64) return;
     if (!canvasRef.current) return;
@@ -209,33 +200,20 @@ export default function QuoteApproval() {
     setSubmitting(true);
     try {
       const signatureDataUrl = dataUrlFromCanvas(canvasRef.current);
-      const execution = await functions.createExecution(
-        FUNCTION_QUOTE_APPROVAL_ID,
-        JSON.stringify({
-          action: 'submit',
-          quoteId,
+      const r = await fetch(`${API_BASE}/public/quotes/${quoteId}/submit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           token,
           approverName: approverName.trim(),
           signatureDataUrl,
-          idDocBase64,
-          idDocName: idDocFile.name,
+          idDocDataUrl: idDocBase64,
           idDocMime: idDocFile.type || 'application/octet-stream',
+          idDocFilename: idDocFile.name,
         })
-      );
-      const raw = execution.responseBody || '';
-      let response: any = null;
-      try { response = JSON.parse(raw); } catch { response = null; }
-      if (!response?.success) {
-        const status = (execution as any).status ?? 'unknown';
-        const code = (execution as any).responseStatusCode ?? 'unknown';
-        const execId = (execution as any).$id ?? '';
-        throw new Error(
-          (response?.error || raw || 'No se pudo enviar la aprobación.') +
-          `\n\nExecution: ${execId}` +
-          `\nStatus: ${status}` +
-          `\nHTTP: ${code}`
-        );
-      }
+      });
+      const response = await r.json().catch(() => null);
+      if (!r.ok || !response?.success) throw new Error(response?.error || 'No se pudo enviar la aprobación.');
       setQuote(prev => prev ? { ...prev, approvalStatus: 'PendingVerification', status: 'InReview' } : prev);
     } catch (e: any) {
       setError(e?.message || 'Error enviando aprobación.');
