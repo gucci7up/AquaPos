@@ -5,7 +5,7 @@ import { databases, functions, Query, ID } from '@/lib/appwrite';
 import { PrintTemplates } from '../components/PrintTemplates';
 
 const DATABASE_ID = import.meta.env.VITE_APPWRITE_DATABASE_ID;
-const COLLECTION_ID = import.meta.env.VITE_APPWRITE_COLLECTION_QUOTES_ID || 'quote';
+const COLLECTION_ID = import.meta.env.VITE_APPWRITE_COLLECTION_QUOTES_ID || 'quotes';
 const COLLECTION_SETTINGS_ID = import.meta.env.VITE_APPWRITE_COLLECTION_SETTINGS_ID || 'settings';
 const FUNCTION_QUOTE_APPROVAL_ID = import.meta.env.VITE_APPWRITE_FUNCTION_QUOTE_APPROVAL_ID;
 const ENDPOINT = import.meta.env.VITE_APPWRITE_ENDPOINT;

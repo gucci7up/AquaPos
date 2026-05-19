@@ -13,7 +13,7 @@ const DB = import.meta.env.VITE_APPWRITE_DATABASE_ID;
 const COL_INV = import.meta.env.VITE_APPWRITE_COLLECTION_INVENTORY_ID || 'inventory';
 const COL_SAL = import.meta.env.VITE_APPWRITE_COLLECTION_SALES_ID || 'sales';
 const COL_CUS = import.meta.env.VITE_APPWRITE_COLLECTION_CUSTOMERS_ID || 'customers';
-const COL_QUO = import.meta.env.VITE_APPWRITE_COLLECTION_QUOTES_ID || 'quote';
+const COL_QUO = import.meta.env.VITE_APPWRITE_COLLECTION_QUOTES_ID || 'quotes';
 const COL_PAY = import.meta.env.VITE_APPWRITE_COLLECTION_PAYMENTS_ID || 'payments';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────

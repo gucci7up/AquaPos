@@ -12,7 +12,7 @@ const COL_CUSTOMERS = import.meta.env.VITE_APPWRITE_COLLECTION_CUSTOMERS_ID || '
 const COL_PAYMENTS = import.meta.env.VITE_APPWRITE_COLLECTION_PAYMENTS_ID || 'payments';
 const COL_SUPPLIERS = import.meta.env.VITE_APPWRITE_COLLECTION_SUPPLIERS_ID || 'suppliers';
 const COL_ORDERS = import.meta.env.VITE_APPWRITE_COLLECTION_ORDERS_ID || 'orders';
-const COL_QUOTES = import.meta.env.VITE_APPWRITE_COLLECTION_QUOTES_ID || 'quote';
+const COL_QUOTES = import.meta.env.VITE_APPWRITE_COLLECTION_QUOTES_ID || 'quotes';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 const fmt = (n: number) =>
