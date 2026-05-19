@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { LanguageProvider, useLanguage } from './LanguageContext';
 import { BrandingProvider, useBranding } from './BrandingContext';
-import LandingPage from './views/LandingPage';
 import Dashboard from './views/Dashboard';
 import POS from './views/POS';
 import Inventory from './views/Inventory';
@@ -185,8 +184,7 @@ export default function App() {
       <BrandingProvider>
         <BrowserRouter>
           <Routes>
-            {/* Landing Page Route - No Layout */}
-            <Route path="/" element={<LandingPage />} />
+            <Route path="/" element={<Navigate to="/login" replace />} />
 
             {/* Auth Route - No Layout */}
             <Route path="/login" element={<Auth />} />
