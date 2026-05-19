@@ -12,6 +12,9 @@ const {
   MYSQL_PASSWORD,
   MYSQL_DATABASE,
   CORS_ORIGIN = '*',
+  TELEGRAM_BOT_TOKEN,
+  TELEGRAM_ADMIN_CHAT_ID,
+  TELEGRAM_WEBHOOK_TOKEN,
 } = process.env;
 
 if (!MYSQL_HOST || !MYSQL_USER || !MYSQL_DATABASE) {
@@ -30,6 +33,19 @@ const pool = mysql.createPool({
 });
 
 async function ensureSchema() {
+  const ensureTable = async (table, createSql) => {
+    const [rows] = await pool.query(
+      `SELECT 1 as ok
+       FROM information_schema.TABLES
+       WHERE TABLE_SCHEMA = DATABASE()
+         AND TABLE_NAME = ?
+       LIMIT 1`,
+      [table]
+    );
+    if (rows.length) return;
+    await pool.query(createSql);
+  };
+
   const ensureColumn = async (table, column, definition) => {
     const [rows] = await pool.query(
       `SELECT 1 as ok
@@ -66,6 +82,40 @@ async function ensureSchema() {
   await ensureColumn('quote_approvals', 'short_code', 'VARCHAR(32) NULL');
   await ensureUniqueIndex('quote_approvals', 'uq_quote_approvals_short_code', 'short_code');
   await ensureColumn('quotes', 'business_id', 'VARCHAR(64) NULL');
+
+  await ensureTable(
+    'support_conversations',
+    `CREATE TABLE \`support_conversations\` (
+      \`id\` BIGINT NOT NULL AUTO_INCREMENT,
+      \`business_id\` VARCHAR(64) NOT NULL,
+      \`user_id\` VARCHAR(64) NOT NULL,
+      \`user_name\` VARCHAR(255) NULL,
+      \`user_email\` VARCHAR(255) NULL,
+      \`status\` VARCHAR(32) NOT NULL DEFAULT 'Open',
+      \`last_message_at\` DATETIME NULL,
+      \`telegram_last_message_id\` BIGINT NULL,
+      \`created_at\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      \`updated_at\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      PRIMARY KEY (\`id\`),
+      KEY \`idx_support_conversations_business_updated\` (\`business_id\`, \`updated_at\`),
+      KEY \`idx_support_conversations_business_user\` (\`business_id\`, \`user_id\`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`
+  );
+
+  await ensureTable(
+    'support_messages',
+    `CREATE TABLE \`support_messages\` (
+      \`id\` BIGINT NOT NULL AUTO_INCREMENT,
+      \`conversation_id\` BIGINT NOT NULL,
+      \`sender\` VARCHAR(16) NOT NULL,
+      \`body\` TEXT NOT NULL,
+      \`telegram_message_id\` BIGINT NULL,
+      \`created_at\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (\`id\`),
+      KEY \`idx_support_messages_conversation_id\` (\`conversation_id\`),
+      KEY \`idx_support_messages_conversation_created\` (\`conversation_id\`, \`created_at\`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`
+  );
 }
 
 function parseDataUrl(input) {
@@ -88,10 +138,422 @@ function getBusinessId(req) {
   return v || null;
 }
 
+function getRequester(req) {
+  const userId = String(req.header('x-user-id') || '').trim() || null;
+  const userName = String(req.header('x-user-name') || '').trim() || null;
+  const userEmail = String(req.header('x-user-email') || '').trim() || null;
+  const isAdmin = String(req.header('x-user-admin') || '').trim() === '1';
+  return { userId, userName, userEmail, isAdmin };
+}
+
+function telegramEnabled() {
+  return Boolean(TELEGRAM_BOT_TOKEN && TELEGRAM_ADMIN_CHAT_ID);
+}
+
+async function sendTelegramMessage(text, replyToMessageId) {
+  if (!telegramEnabled()) return null;
+  const payload = {
+    chat_id: TELEGRAM_ADMIN_CHAT_ID,
+    text,
+    disable_web_page_preview: true,
+  };
+  if (replyToMessageId) payload.reply_to_message_id = replyToMessageId;
+  const r = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  const data = await r.json().catch(() => null);
+  if (!r.ok || !data?.ok) {
+    throw new Error(data?.description || `Telegram sendMessage failed (${r.status})`);
+  }
+  return data.result;
+}
+
 app.get('/health', async (_req, res) => {
   try {
     const [rows] = await pool.query('SELECT 1 as ok');
     res.json({ ok: true, db: rows?.[0]?.ok === 1 });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  }
+});
+
+app.get('/api/support/config', async (_req, res) => {
+  res.json({
+    success: true,
+    telegram: {
+      enabled: telegramEnabled(),
+      inboundEnabled: Boolean(TELEGRAM_WEBHOOK_TOKEN),
+    },
+  });
+});
+
+app.get('/api/support/me', async (req, res) => {
+  const businessId = getBusinessId(req);
+  const { userId, userName, userEmail } = getRequester(req);
+  if (!businessId) {
+    res.status(400).json({ success: false, error: 'Missing x-business-id' });
+    return;
+  }
+  if (!userId) {
+    res.status(400).json({ success: false, error: 'Missing x-user-id' });
+    return;
+  }
+  try {
+    const [cRows] = await pool.query(
+      `SELECT id, business_id, user_id, user_name, user_email, status, last_message_at, created_at, updated_at
+       FROM support_conversations
+       WHERE business_id = ? AND user_id = ?
+       ORDER BY created_at DESC
+       LIMIT 1`,
+      [businessId, userId]
+    );
+    let conversation = cRows?.[0] || null;
+    if (!conversation) {
+      const [r] = await pool.query(
+        `INSERT INTO support_conversations (business_id, user_id, user_name, user_email, status, last_message_at)
+         VALUES (?, ?, ?, ?, ?, NOW())`,
+        [businessId, userId, userName, userEmail, 'Open']
+      );
+      const [fresh] = await pool.query(
+        `SELECT id, business_id, user_id, user_name, user_email, status, last_message_at, created_at, updated_at
+         FROM support_conversations
+         WHERE id = ?
+         LIMIT 1`,
+        [r.insertId]
+      );
+      conversation = fresh?.[0] || null;
+    }
+    const [mRows] = await pool.query(
+      `SELECT id, sender, body, created_at
+       FROM support_messages
+       WHERE conversation_id = ?
+       ORDER BY id ASC
+       LIMIT 200`,
+      [conversation.id]
+    );
+    res.json({ success: true, conversation, messages: mRows });
+  } catch (e) {
+    res.status(500).json({ success: false, error: String(e?.message || e) });
+  }
+});
+
+app.post('/api/support/me/messages', async (req, res) => {
+  const businessId = getBusinessId(req);
+  const { userId, userName, userEmail } = getRequester(req);
+  if (!businessId) {
+    res.status(400).json({ success: false, error: 'Missing x-business-id' });
+    return;
+  }
+  if (!userId) {
+    res.status(400).json({ success: false, error: 'Missing x-user-id' });
+    return;
+  }
+  const text = String(req.body?.text || '').trim();
+  if (!text) {
+    res.status(400).json({ success: false, error: 'Missing text' });
+    return;
+  }
+  if (text.length > 3000) {
+    res.status(400).json({ success: false, error: 'Message too long' });
+    return;
+  }
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    const [cRows] = await conn.query(
+      `SELECT id, telegram_last_message_id
+       FROM support_conversations
+       WHERE business_id = ? AND user_id = ?
+       ORDER BY created_at DESC
+       LIMIT 1`,
+      [businessId, userId]
+    );
+    let conversationId = cRows?.[0]?.id || null;
+    let telegramLastMessageId = cRows?.[0]?.telegram_last_message_id || null;
+    if (!conversationId) {
+      const [r] = await conn.query(
+        `INSERT INTO support_conversations (business_id, user_id, user_name, user_email, status, last_message_at)
+         VALUES (?, ?, ?, ?, ?, NOW())`,
+        [businessId, userId, userName, userEmail, 'Open']
+      );
+      conversationId = r.insertId;
+      telegramLastMessageId = null;
+    } else {
+      await conn.query(
+        `UPDATE support_conversations
+         SET user_name = COALESCE(?, user_name),
+             user_email = COALESCE(?, user_email),
+             status = 'Open',
+             last_message_at = NOW()
+         WHERE id = ?`,
+        [userName, userEmail, conversationId]
+      );
+    }
+
+    const [mRes] = await conn.query(
+      `INSERT INTO support_messages (conversation_id, sender, body)
+       VALUES (?, ?, ?)`,
+      [conversationId, 'user', text]
+    );
+    const messageId = mRes.insertId;
+
+    if (telegramEnabled()) {
+      const header = `SUP-${conversationId}\nNegocio: ${businessId}\nUsuario: ${userName || userEmail || userId}\n\n`;
+      const telegramText = header + text;
+      const result = await sendTelegramMessage(telegramText, telegramLastMessageId || undefined);
+      if (result?.message_id) {
+        await conn.query(
+          `UPDATE support_messages SET telegram_message_id = ? WHERE id = ?`,
+          [result.message_id, messageId]
+        );
+        await conn.query(
+          `UPDATE support_conversations SET telegram_last_message_id = ? WHERE id = ?`,
+          [result.message_id, conversationId]
+        );
+      }
+    }
+
+    await conn.commit();
+
+    const [conversationRows] = await pool.query(
+      `SELECT id, business_id, user_id, user_name, user_email, status, last_message_at, created_at, updated_at
+       FROM support_conversations
+       WHERE id = ?
+       LIMIT 1`,
+      [conversationId]
+    );
+    const [messageRows] = await pool.query(
+      `SELECT id, sender, body, created_at
+       FROM support_messages
+       WHERE id = ?
+       LIMIT 1`,
+      [messageId]
+    );
+    res.json({ success: true, conversation: conversationRows?.[0] || null, message: messageRows?.[0] || null });
+  } catch (e) {
+    await conn.rollback();
+    res.status(500).json({ success: false, error: String(e?.message || e) });
+  } finally {
+    conn.release();
+  }
+});
+
+app.get('/api/support/conversations', async (req, res) => {
+  const businessId = getBusinessId(req);
+  const { isAdmin } = getRequester(req);
+  if (!businessId) {
+    res.status(400).json({ success: false, error: 'Missing x-business-id' });
+    return;
+  }
+  if (!isAdmin) {
+    res.status(403).json({ success: false, error: 'Forbidden' });
+    return;
+  }
+  try {
+    const [rows] = await pool.query(
+      `SELECT
+         c.id, c.user_id, c.user_name, c.user_email, c.status, c.last_message_at, c.created_at, c.updated_at,
+         m.sender as last_sender, m.body as last_body, m.created_at as last_created_at
+       FROM support_conversations c
+       LEFT JOIN support_messages m ON m.id = (
+         SELECT sm.id FROM support_messages sm WHERE sm.conversation_id = c.id ORDER BY sm.id DESC LIMIT 1
+       )
+       WHERE c.business_id = ?
+       ORDER BY COALESCE(c.last_message_at, c.created_at) DESC
+       LIMIT 200`,
+      [businessId]
+    );
+    res.json({ success: true, conversations: rows });
+  } catch (e) {
+    res.status(500).json({ success: false, error: String(e?.message || e) });
+  }
+});
+
+app.get('/api/support/conversations/:id', async (req, res) => {
+  const businessId = getBusinessId(req);
+  const { isAdmin } = getRequester(req);
+  if (!businessId) {
+    res.status(400).json({ success: false, error: 'Missing x-business-id' });
+    return;
+  }
+  if (!isAdmin) {
+    res.status(403).json({ success: false, error: 'Forbidden' });
+    return;
+  }
+  const conversationId = Number(req.params.id);
+  if (!Number.isFinite(conversationId)) {
+    res.status(400).json({ success: false, error: 'Invalid conversation id' });
+    return;
+  }
+  try {
+    const [cRows] = await pool.query(
+      `SELECT id, business_id, user_id, user_name, user_email, status, last_message_at, created_at, updated_at
+       FROM support_conversations
+       WHERE id = ? AND business_id = ?
+       LIMIT 1`,
+      [conversationId, businessId]
+    );
+    if (!cRows.length) {
+      res.status(404).json({ success: false, error: 'Conversation not found' });
+      return;
+    }
+    const [mRows] = await pool.query(
+      `SELECT id, sender, body, created_at
+       FROM support_messages
+       WHERE conversation_id = ?
+       ORDER BY id ASC
+       LIMIT 500`,
+      [conversationId]
+    );
+    res.json({ success: true, conversation: cRows[0], messages: mRows });
+  } catch (e) {
+    res.status(500).json({ success: false, error: String(e?.message || e) });
+  }
+});
+
+app.post('/api/support/conversations/:id/messages', async (req, res) => {
+  const businessId = getBusinessId(req);
+  const { isAdmin } = getRequester(req);
+  if (!businessId) {
+    res.status(400).json({ success: false, error: 'Missing x-business-id' });
+    return;
+  }
+  if (!isAdmin) {
+    res.status(403).json({ success: false, error: 'Forbidden' });
+    return;
+  }
+  const conversationId = Number(req.params.id);
+  if (!Number.isFinite(conversationId)) {
+    res.status(400).json({ success: false, error: 'Invalid conversation id' });
+    return;
+  }
+  const text = String(req.body?.text || '').trim();
+  if (!text) {
+    res.status(400).json({ success: false, error: 'Missing text' });
+    return;
+  }
+  if (text.length > 3000) {
+    res.status(400).json({ success: false, error: 'Message too long' });
+    return;
+  }
+  try {
+    const [cRows] = await pool.query(`SELECT id FROM support_conversations WHERE id = ? AND business_id = ? LIMIT 1`, [
+      conversationId,
+      businessId,
+    ]);
+    if (!cRows.length) {
+      res.status(404).json({ success: false, error: 'Conversation not found' });
+      return;
+    }
+    const [r] = await pool.query(
+      `INSERT INTO support_messages (conversation_id, sender, body)
+       VALUES (?, ?, ?)`,
+      [conversationId, 'agent', text]
+    );
+    await pool.query(`UPDATE support_conversations SET status = 'Open', last_message_at = NOW() WHERE id = ?`, [conversationId]);
+    const [mRows] = await pool.query(`SELECT id, sender, body, created_at FROM support_messages WHERE id = ? LIMIT 1`, [
+      r.insertId,
+    ]);
+    res.json({ success: true, message: mRows?.[0] || null });
+  } catch (e) {
+    res.status(500).json({ success: false, error: String(e?.message || e) });
+  }
+});
+
+app.post('/api/support/conversations/:id/status', async (req, res) => {
+  const businessId = getBusinessId(req);
+  const { isAdmin } = getRequester(req);
+  if (!businessId) {
+    res.status(400).json({ success: false, error: 'Missing x-business-id' });
+    return;
+  }
+  if (!isAdmin) {
+    res.status(403).json({ success: false, error: 'Forbidden' });
+    return;
+  }
+  const conversationId = Number(req.params.id);
+  const status = String(req.body?.status || '').trim();
+  if (!Number.isFinite(conversationId) || !status) {
+    res.status(400).json({ success: false, error: 'Missing conversationId/status' });
+    return;
+  }
+  try {
+    const [r] = await pool.query(
+      `UPDATE support_conversations
+       SET status = ?, last_message_at = NOW()
+       WHERE id = ? AND business_id = ?`,
+      [status, conversationId, businessId]
+    );
+    res.json({ success: true, affectedRows: r.affectedRows || 0 });
+  } catch (e) {
+    res.status(500).json({ success: false, error: String(e?.message || e) });
+  }
+});
+
+function extractConversationFromText(text) {
+  const s = String(text || '');
+  const cmd = s.match(/^\/r\s+(\d+)\s+([\s\S]+)$/i);
+  if (cmd) return { conversationId: Number(cmd[1]), body: String(cmd[2]).trim() };
+  const m = s.match(/SUP-(\d+)/i);
+  if (m) {
+    const conversationId = Number(m[1]);
+    let body = s.replace(m[0], '').trim();
+    if (body.startsWith(':')) body = body.slice(1).trim();
+    return { conversationId, body };
+  }
+  return null;
+}
+
+app.post('/webhooks/telegram', async (req, res) => {
+  const token = String(req.query.token || '');
+  if (!TELEGRAM_WEBHOOK_TOKEN || token !== TELEGRAM_WEBHOOK_TOKEN) {
+    res.status(403).json({ ok: false });
+    return;
+  }
+  const update = req.body || {};
+  const msg = update.message || update.edited_message || null;
+  const text = msg?.text ? String(msg.text) : '';
+  if (!msg || !text) {
+    res.json({ ok: true });
+    return;
+  }
+  if (msg?.from?.is_bot) {
+    res.json({ ok: true });
+    return;
+  }
+  if (String(msg?.chat?.id || '') !== String(TELEGRAM_ADMIN_CHAT_ID || '')) {
+    res.json({ ok: true });
+    return;
+  }
+
+  const replyText = msg?.reply_to_message?.text ? String(msg.reply_to_message.text) : '';
+  const parsed = extractConversationFromText(replyText) || extractConversationFromText(text);
+  if (!parsed?.conversationId || !parsed.body) {
+    res.json({ ok: true });
+    return;
+  }
+  if (!Number.isFinite(parsed.conversationId)) {
+    res.json({ ok: true });
+    return;
+  }
+
+  try {
+    const [cRows] = await pool.query(`SELECT id FROM support_conversations WHERE id = ? LIMIT 1`, [parsed.conversationId]);
+    if (!cRows.length) {
+      res.json({ ok: true });
+      return;
+    }
+    await pool.query(
+      `INSERT INTO support_messages (conversation_id, sender, body, telegram_message_id)
+       VALUES (?, ?, ?, ?)`,
+      [parsed.conversationId, 'agent', parsed.body, msg.message_id || null]
+    );
+    await pool.query(`UPDATE support_conversations SET status = 'Open', last_message_at = NOW() WHERE id = ?`, [
+      parsed.conversationId,
+    ]);
+    res.json({ ok: true });
   } catch (e) {
     res.status(500).json({ ok: false, error: String(e?.message || e) });
   }
