@@ -202,7 +202,16 @@ export default function Quotes() {
       let response: any = null;
       try { response = JSON.parse(raw); } catch { response = null; }
       if (!response?.success || !response?.token) {
-        throw new Error(response?.error || raw || 'No se pudo generar el link.');
+        const status = (execution as any).status ?? 'unknown';
+        const code = (execution as any).responseStatusCode ?? 'unknown';
+        const execId = (execution as any).$id ?? '';
+        throw new Error(
+          (response?.error || raw || 'No se pudo generar el link.') +
+          `\n\nFunction: ${FUNCTION_QUOTE_APPROVAL_ID}` +
+          `\nExecution: ${execId}` +
+          `\nStatus: ${status}` +
+          `\nHTTP: ${code}`
+        );
       }
       const link = `${window.location.origin}/quote/${id}/approve?token=${response.token}`;
       try {

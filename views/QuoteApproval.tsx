@@ -101,8 +101,20 @@ export default function QuoteApproval() {
           FUNCTION_QUOTE_APPROVAL_ID,
           JSON.stringify({ action: 'get', quoteId, token })
         );
-        const response = JSON.parse(execution.responseBody || '{}');
-        if (!response.success) throw new Error(response.error || 'No se pudo cargar la cotización.');
+        const raw = execution.responseBody || '';
+        let response: any = null;
+        try { response = JSON.parse(raw); } catch { response = null; }
+        if (!response?.success) {
+          const status = (execution as any).status ?? 'unknown';
+          const code = (execution as any).responseStatusCode ?? 'unknown';
+          const execId = (execution as any).$id ?? '';
+          throw new Error(
+            (response?.error || raw || 'No se pudo cargar la cotización.') +
+            `\n\nExecution: ${execId}` +
+            `\nStatus: ${status}` +
+            `\nHTTP: ${code}`
+          );
+        }
         setQuote(response.quote);
       } catch (e: any) {
         setError(e?.message || 'Error cargando cotización.');
@@ -210,8 +222,20 @@ export default function QuoteApproval() {
           idDocMime: idDocFile.type || 'application/octet-stream',
         })
       );
-      const response = JSON.parse(execution.responseBody || '{}');
-      if (!response.success) throw new Error(response.error || 'No se pudo enviar la aprobación.');
+      const raw = execution.responseBody || '';
+      let response: any = null;
+      try { response = JSON.parse(raw); } catch { response = null; }
+      if (!response?.success) {
+        const status = (execution as any).status ?? 'unknown';
+        const code = (execution as any).responseStatusCode ?? 'unknown';
+        const execId = (execution as any).$id ?? '';
+        throw new Error(
+          (response?.error || raw || 'No se pudo enviar la aprobación.') +
+          `\n\nExecution: ${execId}` +
+          `\nStatus: ${status}` +
+          `\nHTTP: ${code}`
+        );
+      }
       setQuote(prev => prev ? { ...prev, approvalStatus: 'PendingVerification', status: 'InReview' } : prev);
     } catch (e: any) {
       setError(e?.message || 'Error enviando aprobación.');
@@ -350,4 +374,3 @@ export default function QuoteApproval() {
     </div>
   );
 }
-
