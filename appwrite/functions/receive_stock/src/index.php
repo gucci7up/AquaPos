@@ -51,6 +51,9 @@ return function ($context) {
 
         // 2. Increment Inventory Stock
         foreach ($items as $item) {
+            if (!isset($item['productId']) || empty($item['productId'])) {
+                continue;
+            }
             $productId = $item['productId'];
             $quantityAdded = (int) $item['qty'];
 

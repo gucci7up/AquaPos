@@ -6,7 +6,6 @@ import { PrintTemplates } from '../components/PrintTemplates';
 import { useTenant } from '../TenantContext';
 
 const DATABASE_ID = import.meta.env.VITE_APPWRITE_DATABASE_ID;
-const COLLECTION_INVENTORY_ID = import.meta.env.VITE_APPWRITE_COLLECTION_INVENTORY_ID || 'inventory';
 const COLLECTION_SUPPLIERS_ID = import.meta.env.VITE_APPWRITE_COLLECTION_SUPPLIERS_ID || 'suppliers';
 const COLLECTION_ORDERS_ID = import.meta.env.VITE_APPWRITE_COLLECTION_ORDERS_ID || 'orders';
 const COLLECTION_SETTINGS_ID = import.meta.env.VITE_APPWRITE_COLLECTION_SETTINGS_ID || 'settings';
@@ -27,7 +26,6 @@ export default function Suppliers() {
     // --- STATE ---
     const [suppliers, setSuppliers] = useState<any[]>([]);
     const [orders, setOrders] = useState<any[]>([]);
-    const [products, setProducts] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [businessSettings, setBusinessSettings] = useState<any>(null);
     const [supplierCategories, setSupplierCategories] = useState<Array<{ id: string; name: string }>>([]);
@@ -77,10 +75,9 @@ export default function Suppliers() {
         if (!DATABASE_ID || !businessId) return;
         setLoading(true);
         try {
-            const [suppRes, ordRes, prodRes] = await Promise.all([
+            const [suppRes, ordRes] = await Promise.all([
                 COLLECTION_SUPPLIERS_ID ? databases.listDocuments(DATABASE_ID, COLLECTION_SUPPLIERS_ID, [Query.equal('businessId', businessId), Query.limit(200)]) : Promise.resolve({ documents: [] }),
-                COLLECTION_ORDERS_ID ? databases.listDocuments(DATABASE_ID, COLLECTION_ORDERS_ID, [Query.equal('businessId', businessId), Query.orderDesc('$createdAt'), Query.limit(200)]) : Promise.resolve({ documents: [] }),
-                COLLECTION_INVENTORY_ID ? databases.listDocuments(DATABASE_ID, COLLECTION_INVENTORY_ID, [Query.equal('businessId', businessId), Query.limit(500)]) : Promise.resolve({ documents: [] })
+                COLLECTION_ORDERS_ID ? databases.listDocuments(DATABASE_ID, COLLECTION_ORDERS_ID, [Query.equal('businessId', businessId), Query.orderDesc('$createdAt'), Query.limit(200)]) : Promise.resolve({ documents: [] })
             ]);
 
             setSuppliers(suppRes.documents.map(d => ({ ...d, id: d.$id })));
@@ -89,7 +86,6 @@ export default function Suppliers() {
                 id: d.$id,
                 items: typeof d.items === 'string' ? JSON.parse(d.items) : d.items
             })));
-            setProducts(prodRes.documents.map(d => ({ ...d, id: d.$id })));
         } catch (error) {
             console.error('Error fetching suppliers data:', error);
         } finally {
@@ -379,24 +375,14 @@ export default function Suppliers() {
     const addOrderItem = () => {
         setOrderForm({
             ...orderForm,
-            items: [...orderForm.items, { id: Date.now(), productId: '', name: '', qty: 1, cost: 0, total: 0 }]
+            items: [...orderForm.items, { id: Date.now(), name: '', qty: 1, cost: 0, total: 0 }]
         });
     };
 
     const updateOrderItem = (index: number, field: string, value: any) => {
         const newItems = [...orderForm.items];
         const item = newItems[index];
-
-        if (field === 'productId') {
-            const product = products.find(p => p.id == value);
-            if (product) {
-                item.productId = product.id;
-                item.name = product.name;
-                item.cost = product.cost;
-            }
-        } else {
-            item[field] = value;
-        }
+        item[field] = value;
 
         // Recalculate Row Total
         item.total = item.qty * item.cost;
@@ -654,7 +640,7 @@ export default function Suppliers() {
                                     <table className="w-full text-left">
                                         <thead className="bg-slate-50 text-xs font-bold text-slate-500 uppercase">
                                             <tr>
-                                                <th className="px-4 py-3">Product</th>
+                                                <th className="px-4 py-3">Producto</th>
                                                 <th className="px-4 py-3 w-24 text-center">Qty</th>
                                                 <th className="px-4 py-3 w-32 text-right">Cost</th>
                                                 <th className="px-4 py-3 w-32 text-right">Total</th>
@@ -665,14 +651,12 @@ export default function Suppliers() {
                                             {orderForm.items.map((item: any, idx: number) => (
                                                 <tr key={item.id}>
                                                     <td className="p-2">
-                                                        <select
+                                                        <input
                                                             className="w-full p-2 bg-white border border-slate-200 rounded-lg text-sm focus:border-primary outline-none"
-                                                            value={item.productId}
-                                                            onChange={(e) => updateOrderItem(idx, 'productId', e.target.value)}
-                                                        >
-                                                            <option value="">Select Product...</option>
-                                                            {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                                                        </select>
+                                                            value={item.name || ''}
+                                                            onChange={(e) => updateOrderItem(idx, 'name', e.target.value)}
+                                                            placeholder="Ej: Agua 5 galones"
+                                                        />
                                                     </td>
                                                     <td className="p-2">
                                                         <input
