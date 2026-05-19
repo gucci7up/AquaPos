@@ -62,15 +62,14 @@ export default function QuoteApproval() {
       const canvas = canvasRef.current;
       if (!canvas) return;
       const rect = canvas.getBoundingClientRect();
-      const dpr = window.devicePixelRatio || 1;
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
       ctx.setTransform(1, 0, 0, 1, 0, 0);
-      canvas.width = Math.max(1, Math.floor(rect.width * dpr));
-      canvas.height = Math.max(1, Math.floor(rect.height * dpr));
+      canvas.width = Math.max(1, Math.floor(rect.width));
+      canvas.height = Math.max(1, Math.floor(rect.height));
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
-      ctx.lineWidth = 3 * dpr;
+      ctx.lineWidth = 3;
       ctx.strokeStyle = '#0f172a';
     };
 
@@ -122,13 +121,13 @@ export default function QuoteApproval() {
   const getLocalPoint = (e: PointerEvent | React.PointerEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
     if (!canvas) return null;
+    const ne = (e as any).nativeEvent;
+    if (ne && typeof ne.offsetX === 'number' && typeof ne.offsetY === 'number') {
+      return { x: ne.offsetX, y: ne.offsetY };
+    }
     const rect = canvas.getBoundingClientRect();
-    const clientX = (e as any).clientX;
-    const clientY = (e as any).clientY;
-    const scaleX = rect.width ? canvas.width / rect.width : 1;
-    const scaleY = rect.height ? canvas.height / rect.height : 1;
-    const x = (clientX - rect.left) * scaleX;
-    const y = (clientY - rect.top) * scaleY;
+    const x = (e as any).clientX - rect.left;
+    const y = (e as any).clientY - rect.top;
     return { x, y };
   };
 
@@ -303,6 +302,7 @@ export default function QuoteApproval() {
                     <canvas
                       ref={canvasRef}
                       className="w-full h-[260px] touch-none"
+                      style={{ touchAction: 'none' }}
                       onPointerDown={(e) => {
                         e.preventDefault();
                         drawingRef.current = true;
