@@ -14,8 +14,6 @@ import AquaAI from './views/AquaAI';
 import Settings from './views/Settings';
 import Support from './views/Support';
 import Auth from './views/Auth';
-import Subscriptions from './views/Subscriptions';
-import SubscriptionCheckout from './views/SubscriptionCheckout';
 
 const SidebarLink = ({ to, icon, label, isNew = false, onClick }: { to: string; icon: string; label: string; isNew?: boolean; onClick?: () => void }) => {
   const location = useLocation();
@@ -97,7 +95,6 @@ const Layout = ({ children }: { children?: React.ReactNode }) => {
             <SidebarLink to="/quotes" icon="request_quote" label={t('sidebar.quotes')} />
             <SidebarLink to="/finance" icon="account_balance" label={t('sidebar.finance')} />
             <SidebarLink to="/customers" icon="group" label={t('sidebar.customers')} />
-            <SidebarLink to="/subscriptions" icon="loyalty" label={t('sidebar.subscriptions')} />
           </div>
 
           <div className="pt-4 border-t border-slate-100">
@@ -154,7 +151,6 @@ const Layout = ({ children }: { children?: React.ReactNode }) => {
                 <MenuGridItem to="/customers" icon="group" label="Clients" color="bg-blue-100 text-blue-600" onClick={() => setIsMobileMenuOpen(false)} />
                 <MenuGridItem to="/ai" icon="auto_awesome" label="AquaAI" color="bg-primary/20 text-primary" onClick={() => setIsMobileMenuOpen(false)} />
                 <MenuGridItem to="/quotes" icon="request_quote" label="Quotes" color="bg-purple-100 text-purple-600" onClick={() => setIsMobileMenuOpen(false)} />
-                <MenuGridItem to="/subscriptions" icon="loyalty" label="Subs" color="bg-pink-100 text-pink-600" onClick={() => setIsMobileMenuOpen(false)} />
                 <MenuGridItem to="/settings" icon="settings" label="Settings" color="bg-slate-100 text-slate-600" onClick={() => setIsMobileMenuOpen(false)} />
                 <MenuGridItem to="/support" icon="help" label="Support" color="bg-amber-100 text-amber-600" onClick={() => setIsMobileMenuOpen(false)} />
               </div>
@@ -189,9 +185,6 @@ export default function App() {
             {/* Auth Route - No Layout */}
             <Route path="/login" element={<Auth />} />
 
-            {/* Public Checkout - No Layout */}
-            <Route path="/checkout/:planSlug" element={<SubscriptionCheckout />} />
-
             {/* Application Routes - Wrapped in Layout */}
             <Route path="/dashboard" element={<Layout><Dashboard /></Layout>} />
             <Route path="/pos" element={<Layout><POS /></Layout>} />
@@ -201,7 +194,6 @@ export default function App() {
             <Route path="/quotes" element={<Layout><Quotes /></Layout>} />
             <Route path="/finance" element={<Layout><Finance /></Layout>} />
             <Route path="/customers" element={<Layout><Customers /></Layout>} />
-            <Route path="/subscriptions" element={<Layout><Subscriptions /></Layout>} />
             <Route path="/ai" element={<Layout><AquaAI /></Layout>} />
             <Route path="/settings" element={<Layout><Settings /></Layout>} />
             <Route path="/support" element={<Layout><Support /></Layout>} />
