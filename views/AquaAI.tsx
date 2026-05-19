@@ -10,6 +10,9 @@ const COL_SALES = import.meta.env.VITE_APPWRITE_COLLECTION_SALES_ID || 'sales';
 const COL_INVENTORY = import.meta.env.VITE_APPWRITE_COLLECTION_INVENTORY_ID || 'inventory';
 const COL_CUSTOMERS = import.meta.env.VITE_APPWRITE_COLLECTION_CUSTOMERS_ID || 'customers';
 const COL_PAYMENTS = import.meta.env.VITE_APPWRITE_COLLECTION_PAYMENTS_ID || 'payments';
+const COL_SUPPLIERS = import.meta.env.VITE_APPWRITE_COLLECTION_SUPPLIERS_ID || 'suppliers';
+const COL_ORDERS = import.meta.env.VITE_APPWRITE_COLLECTION_ORDERS_ID || 'orders';
+const COL_QUOTES = import.meta.env.VITE_APPWRITE_COLLECTION_QUOTES_ID || 'quotes';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 const fmt = (n: number) =>
@@ -44,6 +47,9 @@ interface AppData {
   inventory: any[];
   customers: any[];
   payments: any[];
+  suppliers: any[];
+  orders: any[];
+  quotes: any[];
 }
 
 // ─── AI Engine: build context-aware response from real data ──────────────────
@@ -66,6 +72,17 @@ function buildAiResponse(question: string, data: AppData, lang: string): string 
 
   const totalRevenue = salesThisMonth.reduce((a, s) => a + num(s.total), 0);
   const totalSalesAll = data.sales.reduce((a, s) => a + num(s.total), 0);
+
+  const costMap: Record<string, number> = {};
+  data.inventory.forEach(p => { costMap[p.$id] = num(p.cost); });
+
+  const cogsThisMonth = salesThisMonth.reduce((total, sale) => {
+    let items: any[] = [];
+    try { items = typeof sale.items === 'string' ? JSON.parse(sale.items) : (sale.items || []); } catch { items = []; }
+    return total + items.reduce((st: number, item: any) => st + (costMap[item.id] || 0) * num(item.quantity || 1), 0);
+  }, 0);
+  const grossProfitThisMonth = totalRevenue - cogsThisMonth;
+  const grossMarginThisMonth = totalRevenue > 0 ? (grossProfitThisMonth / totalRevenue) * 100 : 0;
 
   // Top selling products (by frequency in sales items)
   const productSales: Record<string, { name: string; qty: number; revenue: number }> = {};
@@ -116,6 +133,27 @@ function buildAiResponse(question: string, data: AppData, lang: string): string 
     }))
     .sort((a, b) => b.margin - a.margin);
 
+  const ordersThisMonth = data.orders.filter(o => {
+    const d = new Date(o.date || o.$createdAt);
+    return d.getMonth() === thisMonth && d.getFullYear() === thisYear;
+  });
+  const pendingOrders = data.orders.filter(o => ['Draft', 'Ordered'].includes(String(o.status || '')));
+  const receivedOrders = data.orders.filter(o => String(o.status) === 'Received');
+  const supplierSpendAll = data.orders.reduce((a, o) => a + num(o.total), 0);
+  const supplierSpendThisMonth = ordersThisMonth.reduce((a, o) => a + num(o.total), 0);
+
+  const quoteByStatus = data.quotes.reduce((acc: Record<string, number>, qte: any) => {
+    const s = String(qte.status || 'Draft');
+    acc[s] = (acc[s] || 0) + 1;
+    return acc;
+  }, {});
+  const quotesTotalAll = data.quotes.reduce((a, qte) => a + num(qte.total), 0);
+  const quotesThisMonth = data.quotes.filter(qte => {
+    const d = new Date(qte.date || qte.$createdAt);
+    return d.getMonth() === thisMonth && d.getFullYear() === thisYear;
+  });
+  const quotesTotalThisMonth = quotesThisMonth.reduce((a, qte) => a + num(qte.total), 0);
+
   // ── Match question intent ────────────────────────────────────────────────
   // Sales / Revenue
   if (/venta|sale|revenue|ingreso|facturacion|facturaci/.test(q)) {
@@ -125,6 +163,26 @@ function buildAiResponse(question: string, data: AppData, lang: string): string 
       return `📊 **Ventas del mes actual:** RD$${fmt(totalRevenue)} en ${n} transacciones.\n\n🏆 **Producto líder:** ${topName} (RD$${fmt(topSellers[0]?.revenue || 0)}).\n\n📈 **Total histórico en el sistema:** RD$${fmt(totalSalesAll)} en ${data.sales.length} ventas.`;
     }
     return `📊 **This month's sales:** $${fmt(totalRevenue)} across ${n} transactions.\n\n🏆 **Top product:** ${topName} ($${fmt(topSellers[0]?.revenue || 0)}).\n\n📈 **All-time total:** $${fmt(totalSalesAll)} across ${data.sales.length} sales.`;
+  }
+
+  // Suppliers / Orders
+  if (/proveedor|supplier|suppliers|orden|order|orders|compra|purchase|reabastec|restock/.test(q)) {
+    if (isEs) {
+      return `🚚 **Proveedores:** ${data.suppliers.length}\n📦 **Órdenes:** ${data.orders.length}\n\n⏳ **Pendientes:** ${pendingOrders.length}\n✅ **Recibidas:** ${receivedOrders.length}\n\n💸 **Compras este mes:** RD$${fmt(supplierSpendThisMonth)}\n💸 **Compras históricas:** RD$${fmt(supplierSpendAll)}`;
+    }
+    return `🚚 **Suppliers:** ${data.suppliers.length}\n📦 **Orders:** ${data.orders.length}\n\n⏳ **Pending:** ${pendingOrders.length}\n✅ **Received:** ${receivedOrders.length}\n\n💸 **Spend this month:** $${fmt(supplierSpendThisMonth)}\n💸 **All-time spend:** $${fmt(supplierSpendAll)}`;
+  }
+
+  // Quotes / Cotizaciones
+  if (/cotiz|quote|quotes|propuesta|proposal/.test(q)) {
+    const draft = quoteByStatus['Draft'] || 0;
+    const sent = quoteByStatus['Sent'] || 0;
+    const expired = quoteByStatus['Expired'] || 0;
+    const converted = quoteByStatus['Converted'] || 0;
+    if (isEs) {
+      return `🧾 **Cotizaciones:** ${data.quotes.length}\n\n📝 **Draft:** ${draft}\n📤 **Sent:** ${sent}\n⌛ **Expired:** ${expired}\n✅ **Converted:** ${converted}\n\n💰 **Total cotizado este mes:** RD$${fmt(quotesTotalThisMonth)}\n💰 **Total cotizado histórico:** RD$${fmt(quotesTotalAll)}`;
+    }
+    return `🧾 **Quotes:** ${data.quotes.length}\n\n📝 **Draft:** ${draft}\n📤 **Sent:** ${sent}\n⌛ **Expired:** ${expired}\n✅ **Converted:** ${converted}\n\n💰 **Quoted total this month:** $${fmt(quotesTotalThisMonth)}\n💰 **All-time quoted total:** $${fmt(quotesTotalAll)}`;
   }
 
   // Top products / best sellers
@@ -172,6 +230,14 @@ function buildAiResponse(question: string, data: AppData, lang: string): string 
     return `💰 **Payments received this month:** $${fmt(monthPay)} across ${thisMonthPayments.length} payments.\n\n📊 **All-time payments:** $${fmt(totalAbonos)} across ${data.payments.length} payments.\n\n💳 **Total pending credit:** $${fmt(totalDebt)}`;
   }
 
+  // Finance / profitability
+  if (/finanza|finance|p&l|p y g|pyg|cogs|costo de venta|costo de ventas|estado de resultados|perdida y ganancia|p[ée]rdida y ganancia/.test(q)) {
+    if (isEs) {
+      return `📊 **Finanzas (mes actual)**\n\n💵 **Ingresos:** RD$${fmt(totalRevenue)}\n🧾 **COGS (costo de ventas):** RD$${fmt(cogsThisMonth)}\n📈 **Ganancia bruta:** RD$${fmt(grossProfitThisMonth)} (${grossMarginThisMonth.toFixed(1)}%)\n💳 **Crédito pendiente:** RD$${fmt(totalDebt)}\n💰 **Abonos este mes:** RD$${fmt(data.payments.filter(p => { const d = new Date(p.date || p.$createdAt); return d.getMonth() === thisMonth && d.getFullYear() === thisYear; }).reduce((a, p) => a + num(p.amount), 0))}\n📦 **Inventario al costo:** RD$${fmt(inventoryCost)}\n📦 **Inventario a retail:** RD$${fmt(inventoryRetail)}`;
+    }
+    return `📊 **Finance (this month)**\n\n💵 **Revenue:** $${fmt(totalRevenue)}\n🧾 **COGS:** $${fmt(cogsThisMonth)}\n📈 **Gross profit:** $${fmt(grossProfitThisMonth)} (${grossMarginThisMonth.toFixed(1)}%)\n💳 **Pending credit:** $${fmt(totalDebt)}\n💰 **Payments this month:** $${fmt(data.payments.filter(p => { const d = new Date(p.date || p.$createdAt); return d.getMonth() === thisMonth && d.getFullYear() === thisYear; }).reduce((a, p) => a + num(p.amount), 0))}\n📦 **Inventory at cost:** $${fmt(inventoryCost)}\n📦 **Inventory at retail:** $${fmt(inventoryRetail)}`;
+  }
+
   // Margin / profit / rentabilidad
   if (/margen|margin|profit|rentab|ganancia|beneficio/.test(q)) {
     const top3 = marginProducts.slice(0, 3)
@@ -195,9 +261,9 @@ function buildAiResponse(question: string, data: AppData, lang: string): string 
   // Summary / resumen
   if (/resumen|summary|panorama|overview|general|hola|hello|hi|ayuda|help|que puedes/.test(q)) {
     if (isEs) {
-      return `👋 ¡Hola! Soy **AquaAI**, tu asistente de inteligencia de negocio.\n\nEstoy conectado a tu empresa en tiempo real. Aquí tienes el panorama actual:\n\n📊 **Ventas este mes:** RD$${fmt(totalRevenue)}\n📦 **Productos en inventario:** ${data.inventory.length} (${outOfStock.length} sin stock)\n👥 **Clientes registrados:** ${data.customers.length}\n💳 **Crédito pendiente:** RD$${fmt(totalDebt)}\n💰 **Abonos históricos:** RD$${fmt(totalAbonos)}\n\n💡 Puedes preguntarme sobre ventas, inventario, clientes, márgenes, pagos o cualquier dato de tu negocio.`;
+      return `👋 ¡Hola! Soy **AquaAI**, tu asistente de inteligencia de negocio.\n\nEstoy conectado a tu empresa en tiempo real. Aquí tienes el panorama actual:\n\n📊 **Ventas este mes:** RD$${fmt(totalRevenue)}\n📦 **Productos en inventario:** ${data.inventory.length} (${outOfStock.length} sin stock)\n👥 **Clientes registrados:** ${data.customers.length}\n💳 **Crédito pendiente:** RD$${fmt(totalDebt)}\n💰 **Abonos históricos:** RD$${fmt(totalAbonos)}\n🚚 **Proveedores:** ${data.suppliers.length} · 📦 **Órdenes:** ${data.orders.length}\n🧾 **Cotizaciones:** ${data.quotes.length}\n\n💡 Puedes preguntarme sobre ventas, inventario, clientes, finanzas, proveedores/órdenes y cotizaciones.`;
     }
-    return `👋 Hello! I'm **AquaAI**, your business intelligence assistant.\n\nI'm connected to your business in real time. Here's the current overview:\n\n📊 **Sales this month:** $${fmt(totalRevenue)}\n📦 **Inventory products:** ${data.inventory.length} (${outOfStock.length} out of stock)\n👥 **Registered customers:** ${data.customers.length}\n💳 **Pending credit:** $${fmt(totalDebt)}\n💰 **Total payments received:** $${fmt(totalAbonos)}\n\n💡 Ask me about sales, inventory, customers, margins, payments, or any business data.`;
+    return `👋 Hello! I'm **AquaAI**, your business intelligence assistant.\n\nI'm connected to your business in real time. Here's the current overview:\n\n📊 **Sales this month:** $${fmt(totalRevenue)}\n📦 **Inventory products:** ${data.inventory.length} (${outOfStock.length} out of stock)\n👥 **Registered customers:** ${data.customers.length}\n💳 **Pending credit:** $${fmt(totalDebt)}\n💰 **Total payments received:** $${fmt(totalAbonos)}\n🚚 **Suppliers:** ${data.suppliers.length} · 📦 **Orders:** ${data.orders.length}\n🧾 **Quotes:** ${data.quotes.length}\n\n💡 Ask me about sales, inventory, customers, finance, suppliers/orders, and quotes.`;
   }
 
   // Default
@@ -252,7 +318,7 @@ export default function AquaAI() {
   const isEs = language === 'es';
 
   // Data
-  const [data, setData] = useState<AppData>({ sales: [], inventory: [], customers: [], payments: [] });
+  const [data, setData] = useState<AppData>({ sales: [], inventory: [], customers: [], payments: [], suppliers: [], orders: [], quotes: [] });
   const [loading, setLoading] = useState(true);
 
   // Chat
@@ -269,8 +335,11 @@ export default function AquaAI() {
       fetchAll(DB_ID, COL_INVENTORY),
       fetchAll(DB_ID, COL_CUSTOMERS),
       fetchAll(DB_ID, COL_PAYMENTS),
-    ]).then(([sales, inventory, customers, payments]) => {
-      setData({ sales, inventory, customers, payments });
+      fetchAll(DB_ID, COL_SUPPLIERS),
+      fetchAll(DB_ID, COL_ORDERS),
+      fetchAll(DB_ID, COL_QUOTES),
+    ]).then(([sales, inventory, customers, payments, suppliers, orders, quotes]) => {
+      setData({ sales, inventory, customers, payments, suppliers, orders, quotes });
       setLoading(false);
     }).catch(() => setLoading(false));
   }, []);
@@ -359,8 +428,8 @@ export default function AquaAI() {
   };
 
   const quickQuestions = isEs
-    ? ['¿Cuáles son mis productos más vendidos?', '¿Qué productos tienen bajo stock?', '¿Cuánto crédito pendiente hay?', '¿Cuáles son mis márgenes de ganancia?']
-    : ['What are my best-selling products?', 'Which products have low stock?', 'How much pending credit is there?', 'What are my profit margins?'];
+    ? ['¿Cuáles son mis productos más vendidos?', '¿Qué productos tienen bajo stock?', '¿Cuánto crédito pendiente hay?', '¿Cómo van las finanzas este mes?', '¿Cómo van los proveedores y órdenes?', '¿Cómo van las cotizaciones?']
+    : ['What are my best-selling products?', 'Which products have low stock?', 'How much pending credit is there?', 'How are finances this month?', 'How are suppliers and orders?', 'How are quotes doing?'];
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
