@@ -63,14 +63,14 @@ export default function QuoteApproval() {
       if (!canvas) return;
       const rect = canvas.getBoundingClientRect();
       const dpr = window.devicePixelRatio || 1;
-      canvas.width = Math.max(1, Math.floor(rect.width * dpr));
-      canvas.height = Math.max(1, Math.floor(rect.height * dpr));
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
-      ctx.scale(dpr, dpr);
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      canvas.width = Math.max(1, Math.floor(rect.width * dpr));
+      canvas.height = Math.max(1, Math.floor(rect.height * dpr));
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
-      ctx.lineWidth = 3;
+      ctx.lineWidth = 3 * dpr;
       ctx.strokeStyle = '#0f172a';
     };
 
@@ -123,8 +123,12 @@ export default function QuoteApproval() {
     const canvas = canvasRef.current;
     if (!canvas) return null;
     const rect = canvas.getBoundingClientRect();
-    const x = (e as any).clientX - rect.left;
-    const y = (e as any).clientY - rect.top;
+    const clientX = (e as any).clientX;
+    const clientY = (e as any).clientY;
+    const scaleX = rect.width ? canvas.width / rect.width : 1;
+    const scaleY = rect.height ? canvas.height / rect.height : 1;
+    const x = (clientX - rect.left) * scaleX;
+    const y = (clientY - rect.top) * scaleY;
     return { x, y };
   };
 
@@ -300,11 +304,13 @@ export default function QuoteApproval() {
                       ref={canvasRef}
                       className="w-full h-[260px] touch-none"
                       onPointerDown={(e) => {
+                        e.preventDefault();
                         drawingRef.current = true;
                         lastPointRef.current = getLocalPoint(e) || null;
                         (e.currentTarget as any).setPointerCapture(e.pointerId);
                       }}
                       onPointerMove={(e) => {
+                        e.preventDefault();
                         if (!drawingRef.current) return;
                         const p = getLocalPoint(e);
                         if (!p) return;
