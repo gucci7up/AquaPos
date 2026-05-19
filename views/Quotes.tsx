@@ -285,6 +285,9 @@ export default function Quotes() {
     return `${ENDPOINT}/storage/buckets/${BUCKET_ID}/files/${fileId}/view?project=${PROJECT_ID}`;
   };
 
+  const buildApiDocUrl = (quoteId: string) => `${API_BASE}/api/quotes/${quoteId}/id-doc`;
+  const buildApiSignatureUrl = (quoteId: string) => `${API_BASE}/api/quotes/${quoteId}/signature`;
+
   const openVerify = async (quote: any) => {
     setWorkingQuoteId(quote.id);
     try {
@@ -565,7 +568,7 @@ export default function Quotes() {
                   <div className="p-4">
                     {verifyQuote.signatureDataUrl ? (
                       <img
-                        src={verifyQuote.signatureDataUrl}
+                        src={buildApiSignatureUrl(verifyQuote.id)}
                         alt="Firma"
                         className="w-full rounded-xl border border-slate-200"
                       />
@@ -582,7 +585,7 @@ export default function Quotes() {
                   <div className="p-4">
                     {verifyQuote.idDocDataUrl ? (
                       <a
-                        href={verifyQuote.idDocDataUrl}
+                        href={buildApiDocUrl(verifyQuote.id)}
                         target="_blank"
                         rel="noreferrer"
                         className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-200 font-bold text-slate-700 hover:bg-slate-50"

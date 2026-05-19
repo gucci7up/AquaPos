@@ -51,6 +51,17 @@ async function ensureSchema() {
   await ensureColumn('quote_approvals', 'id_doc_filename', 'VARCHAR(255) NULL');
 }
 
+function parseDataUrl(input) {
+  const s = String(input || '');
+  if (!s) return null;
+  if (s.startsWith('data:')) {
+    const match = s.match(/^data:([^;]+);base64,(.+)$/);
+    if (!match) return null;
+    return { mime: match[1], base64: match[2] };
+  }
+  return { mime: null, base64: s };
+}
+
 const app = express();
 app.use(cors({ origin: CORS_ORIGIN === '*' ? true : CORS_ORIGIN, credentials: true }));
 app.use(express.json({ limit: '35mb' }));
@@ -109,6 +120,73 @@ app.get('/api/quotes/:id', async (req, res) => {
       [quoteId]
     );
     res.json({ success: true, quote: qRows[0], items });
+  } catch (e) {
+    res.status(500).json({ success: false, error: String(e?.message || e) });
+  }
+});
+
+app.get('/api/quotes/:id/id-doc', async (req, res) => {
+  const quoteId = Number(req.params.id);
+  if (!Number.isFinite(quoteId)) {
+    res.status(400).json({ success: false, error: 'Invalid quote id' });
+    return;
+  }
+  try {
+    const [rows] = await pool.query(
+      `SELECT id_doc_data, id_doc_mime, id_doc_filename
+       FROM quote_approvals
+       WHERE quote_id = ?
+       LIMIT 1`,
+      [quoteId]
+    );
+    if (!rows.length) {
+      res.status(404).json({ success: false, error: 'Document not found' });
+      return;
+    }
+    const parsed = parseDataUrl(rows[0].id_doc_data);
+    if (!parsed?.base64) {
+      res.status(404).json({ success: false, error: 'Document not found' });
+      return;
+    }
+    const mime = rows[0].id_doc_mime || parsed.mime || 'application/octet-stream';
+    const filename = rows[0].id_doc_filename || `id-doc-${quoteId}`;
+    const data = Buffer.from(parsed.base64, 'base64');
+    res.setHeader('Content-Type', mime);
+    res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
+    res.send(data);
+  } catch (e) {
+    res.status(500).json({ success: false, error: String(e?.message || e) });
+  }
+});
+
+app.get('/api/quotes/:id/signature', async (req, res) => {
+  const quoteId = Number(req.params.id);
+  if (!Number.isFinite(quoteId)) {
+    res.status(400).json({ success: false, error: 'Invalid quote id' });
+    return;
+  }
+  try {
+    const [rows] = await pool.query(
+      `SELECT signature_data, signature_mime
+       FROM quote_approvals
+       WHERE quote_id = ?
+       LIMIT 1`,
+      [quoteId]
+    );
+    if (!rows.length) {
+      res.status(404).json({ success: false, error: 'Signature not found' });
+      return;
+    }
+    const parsed = parseDataUrl(rows[0].signature_data);
+    if (!parsed?.base64) {
+      res.status(404).json({ success: false, error: 'Signature not found' });
+      return;
+    }
+    const mime = rows[0].signature_mime || parsed.mime || 'image/png';
+    const data = Buffer.from(parsed.base64, 'base64');
+    res.setHeader('Content-Type', mime);
+    res.setHeader('Content-Disposition', `inline; filename="signature-${quoteId}.png"`);
+    res.send(data);
   } catch (e) {
     res.status(500).json({ success: false, error: String(e?.message || e) });
   }
