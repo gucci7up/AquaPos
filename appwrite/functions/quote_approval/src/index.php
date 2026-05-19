@@ -28,7 +28,7 @@ return function ($context, $res_legacy = null) {
 
     $endpoint = $vars['APPWRITE_FUNCTION_ENDPOINT'] ?? '';
     $project = $vars['APPWRITE_FUNCTION_PROJECT_ID'] ?? '';
-    $key = $vars['APPWRITE_FUNCTION_API_KEY'] ?? '';
+    $key = $vars['APPWRITE_FUNCTION_API_KEY'] ?? ($vars['APPWRITE_API_KEY'] ?? '');
 
     if (empty($databaseId) || empty($quotesCollectionId) || empty($endpoint) || empty($project) || empty($key)) {
         return $res->json(['success' => false, 'error' => 'Environment variables missing'], 500);
