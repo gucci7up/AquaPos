@@ -1,12 +1,9 @@
 import React, { useState, useMemo } from 'react';
 import { useLanguage } from '../LanguageContext';
+import { useBranding } from '../BrandingContext';
 import UserMenu from '../UserMenu';
-import { databases, Query } from '@/lib/appwrite';
 import { PrintTemplates } from '../components/PrintTemplates';
 
-const DATABASE_ID = import.meta.env.VITE_APPWRITE_DATABASE_ID;
-const COLLECTION_ID = import.meta.env.VITE_APPWRITE_COLLECTION_QUOTES_ID || 'quotes';
-const COLLECTION_SETTINGS_ID = import.meta.env.VITE_APPWRITE_COLLECTION_SETTINGS_ID || 'settings';
 const ENDPOINT = import.meta.env.VITE_APPWRITE_ENDPOINT;
 const PROJECT_ID = import.meta.env.VITE_APPWRITE_PROJECT_ID;
 const BUCKET_ID = import.meta.env.VITE_APPWRITE_BUCKET_IMAGES_ID || 'products';
@@ -17,9 +14,9 @@ const initialQuotes: any[] = [];
 
 export default function Quotes() {
   const { t } = useLanguage();
+  const { branding } = useBranding();
   const [quotes, setQuotes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [businessSettings, setBusinessSettings] = useState<any>(null);
   const [workingQuoteId, setWorkingQuoteId] = useState<string | null>(null);
   const [verifyQuote, setVerifyQuote] = useState<any | null>(null);
 
@@ -28,7 +25,6 @@ export default function Quotes() {
 
   React.useEffect(() => {
     fetchQuotes();
-    fetchBusinessSettings();
   }, []);
 
   const fetchQuotes = async () => {
@@ -61,15 +57,6 @@ export default function Quotes() {
     }
   };
 
-  const fetchBusinessSettings = async () => {
-    if (!DATABASE_ID || !COLLECTION_SETTINGS_ID) return;
-    try {
-      const response = await databases.listDocuments(DATABASE_ID, COLLECTION_SETTINGS_ID, [Query.limit(1)]);
-      if (response.documents.length > 0) setBusinessSettings(response.documents[0]);
-    } catch (error) {
-      console.error('Error fetching settings for Quotes:', error);
-    }
-  };
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState('All');
 
@@ -367,6 +354,17 @@ export default function Quotes() {
     run();
   };
 
+  const printBusinessSettings = useMemo(() => ({
+    name: branding.businessName,
+    address: branding.address,
+    phone: branding.phone,
+    email: branding.email,
+    website: branding.website,
+    taxId: branding.taxId,
+    taxRegime: branding.taxRegime,
+    logo: branding.logoUrl
+  }), [branding]);
+
   // Modal Form Handlers
   const handleItemChange = (id: number, field: string, value: any) => {
     setFormData(prev => ({
@@ -512,7 +510,7 @@ export default function Quotes() {
             <PrintTemplates
               type="quote"
               data={activeQuoteForPrint}
-              businessSettings={businessSettings}
+              businessSettings={printBusinessSettings}
             />
           )}
         </div>
