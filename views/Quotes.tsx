@@ -94,6 +94,11 @@ export default function Quotes() {
     return items.reduce((sum, item) => sum + (item.qty * item.price), 0);
   };
 
+  const fmtMoney = (val: any) => {
+    const n = Number(val) || 0;
+    return new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
+  };
+
   // CRUD Handlers
   const loadQuoteDetails = async (quoteId: string) => {
     const r = await fetch(`${API_BASE}/api/quotes/${quoteId}`, { credentials: 'include' });
@@ -468,7 +473,7 @@ export default function Quotes() {
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {filteredQuotes.map(quote => {
-                  const totalAmt = quote.total || calculateTotal(quote.items);
+                  const totalAmt = Number(quote.total) || calculateTotal(quote.items);
                   return (
                     <QuoteRow
                       key={quote.id}
@@ -476,7 +481,7 @@ export default function Quotes() {
                       created={new Date(quote.date || quote.$createdAt).toLocaleDateString()}
                       customer={quote.customerName || quote.customer}
                       taxId={quote.taxId}
-                      amount={`$${totalAmt.toFixed(2)}`}
+                      amount={`$${fmtMoney(totalAmt)}`}
                       status={quote.status}
                       approvalStatus={quote.approvalStatus}
                       expiry={new Date(quote.expiry).toLocaleDateString()}
@@ -696,7 +701,7 @@ export default function Quotes() {
                             />
                           </td>
                           <td className="p-2 text-right text-sm font-medium">
-                            ${(item.qty * item.price).toFixed(2)}
+                            ${fmtMoney(item.qty * item.price)}
                           </td>
                           <td className="p-2 text-center">
                             {formData.items.length > 1 && (
@@ -722,11 +727,11 @@ export default function Quotes() {
                 <div className="text-right space-y-1">
                   <div className="flex justify-between gap-8 text-sm">
                     <span className="text-slate-500">Subtotal:</span>
-                    <span className="font-medium text-slate-900">${modalSubtotal.toFixed(2)}</span>
+                    <span className="font-medium text-slate-900">${fmtMoney(modalSubtotal)}</span>
                   </div>
                   <div className="flex justify-between gap-8 text-xl font-bold text-slate-900 pt-2 border-t border-slate-200">
                     <span>Total:</span>
-                    <span className="text-primary">${modalTotal.toFixed(2)}</span>
+                    <span className="text-primary">${fmtMoney(modalTotal)}</span>
                   </div>
                 </div>
                 <button
