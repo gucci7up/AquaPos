@@ -11,6 +11,14 @@ return function ($context, $res_legacy = null) {
     $req = $is_modern ? $context->req : $context;
     $res = $is_modern ? $context->res : $res_legacy;
 
+    $log = function ($msg) use ($context, $is_modern) {
+        if ($is_modern && isset($context->log)) {
+            $context->log($msg);
+        } else {
+            echo $msg . PHP_EOL;
+        }
+    };
+
     $payload = $is_modern ? ($req->body ?? null) : (isset($req['payload']) ? json_decode($req['payload'], true) : null);
     if (is_string($payload)) {
         $payload = json_decode($payload, true);
@@ -66,6 +74,8 @@ return function ($context, $res_legacy = null) {
     };
 
     try {
+        $log('quote_approval: action=' . $action . ' quoteId=' . $quoteId);
+
         if ($action === 'createLink') {
             $token = bin2hex(random_bytes(32));
             $tokenHash = $hashToken($token);
@@ -190,7 +200,8 @@ return function ($context, $res_legacy = null) {
         }
 
         return $res->json(['success' => false, 'error' => 'Unhandled action'], 500);
-    } catch (\Exception $e) {
+    } catch (\Throwable $e) {
+        $log('quote_approval error: ' . $e->getMessage());
         return $res->json(['success' => false, 'error' => $e->getMessage()], 500);
     }
 };
