@@ -8,7 +8,7 @@ const COLLECTION_INVENTORY_ID = import.meta.env.VITE_APPWRITE_COLLECTION_INVENTO
 const COLLECTION_CATEGORIES_ID = import.meta.env.VITE_APPWRITE_COLLECTION_CATEGORIES_ID || 'categories';
 const COLLECTION_SETTINGS_ID = import.meta.env.VITE_APPWRITE_COLLECTION_SETTINGS_ID || 'settings';
 const COLLECTION_SALES_ID = import.meta.env.VITE_APPWRITE_COLLECTION_SALES_ID || 'sales';
-const COLLECTION_QUOTES_ID = import.meta.env.VITE_APPWRITE_COLLECTION_QUOTES_ID || 'quotes';
+const COLLECTION_QUOTES_ID = import.meta.env.VITE_APPWRITE_COLLECTION_QUOTES_ID || 'quote';
 const FUNCTION_PROCESS_SALE_ID = import.meta.env.VITE_APPWRITE_FUNCTION_PROCESS_SALE_ID;
 
 // Extended Product Data (Removed fixed mock data, using it as fallback for icon layout)
