@@ -156,7 +156,11 @@ export default function Quotes() {
       setIsModalOpen(false);
     } catch (error: any) {
       console.error('Error saving quote:', error);
-      alert('Error al guardar la cotización: ' + (error.message || 'Error desconocido'));
+      alert(
+        'Error al guardar la cotización: ' +
+        (error.message || 'Error desconocido') +
+        `\n\nDB: ${DATABASE_ID}\nCollection: ${COLLECTION_ID}\nEndpoint: ${ENDPOINT || 'N/A'}`
+      );
     }
   };
 
