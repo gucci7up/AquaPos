@@ -186,6 +186,7 @@ export default function App() {
             {/* Auth Route - No Layout */}
             <Route path="/login" element={<Auth />} />
             <Route path="/quote/:quoteId/approve" element={<QuoteApproval />} />
+            <Route path="/q/:code" element={<QuoteApproval />} />
 
             {/* Application Routes - Wrapped in Layout */}
             <Route path="/dashboard" element={<Layout><Dashboard /></Layout>} />

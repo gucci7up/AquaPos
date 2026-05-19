@@ -259,8 +259,8 @@ export default function Quotes() {
         body: JSON.stringify({})
       });
       const response = await r.json().catch(() => null);
-      if (!r.ok || !response?.success || !response?.token) throw new Error(response?.error || 'No se pudo generar el link.');
-      const link = `${window.location.origin}/quote/${id}/approve?token=${response.token}`;
+      if (!r.ok || !response?.success || !response?.code) throw new Error(response?.error || 'No se pudo generar el link.');
+      const link = `${window.location.origin}/q/${response.code}`;
       try {
         await navigator.clipboard.writeText(link);
         alert('Link copiado al portapapeles:\n\n' + link);

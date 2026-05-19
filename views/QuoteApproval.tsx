@@ -25,7 +25,7 @@ function dataUrlFromCanvas(canvas: HTMLCanvasElement) {
 
 export default function QuoteApproval() {
   const { language } = useLanguage();
-  const { quoteId } = useParams<{ quoteId: string }>();
+  const { quoteId, code } = useParams<{ quoteId?: string; code?: string }>();
   const [params] = useSearchParams();
   const token = params.get('token') || '';
 
@@ -44,8 +44,9 @@ export default function QuoteApproval() {
   const lastPointRef = useRef<{ x: number; y: number } | null>(null);
 
   const canSubmit = useMemo(() => {
+    if (code) return Boolean(code && approverName.trim() && idDocBase64);
     return Boolean(quoteId && token && approverName.trim() && idDocBase64);
-  }, [quoteId, token, approverName, idDocBase64]);
+  }, [quoteId, token, code, approverName, idDocBase64]);
 
   const itemsTotal = useMemo(() => {
     if (!quote) return 0;
@@ -80,6 +81,38 @@ export default function QuoteApproval() {
 
   useEffect(() => {
     const load = async () => {
+      if (code) {
+        setLoading(true);
+        setError(null);
+        try {
+          const r = await fetch(`${API_BASE}/public/q/${encodeURIComponent(code)}`);
+          const response = await r.json().catch(() => null);
+          if (!r.ok || !response?.success) throw new Error(response?.error || 'No se pudo cargar la cotización.');
+          const q = response.quote || {};
+          const items = (q.items || []).map((it: any) => ({
+            desc: it.description,
+            qty: Number(it.qty) || 0,
+            price: Number(it.price) || 0,
+          }));
+          setQuote({
+            id: String(q.id),
+            customerName: q.customer_name || q.customerName,
+            taxId: q.tax_id || q.taxId,
+            expiry: q.expiry_date || q.expiry,
+            items,
+            subtotal: Number(q.subtotal) || 0,
+            total: Number(q.total) || 0,
+            status: q.status,
+            approvalStatus: q.approval_status || q.approvalStatus,
+          });
+        } catch (e: any) {
+          setError(e?.message || 'Error cargando cotización.');
+        } finally {
+          setLoading(false);
+        }
+        return;
+      }
+
       if (!quoteId || !token) {
         setError('Link inválido o incompleto.');
         setLoading(false);
@@ -116,7 +149,7 @@ export default function QuoteApproval() {
       }
     };
     load();
-  }, [quoteId, token]);
+  }, [quoteId, token, code]);
 
   const getLocalPoint = (e: PointerEvent | React.PointerEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
@@ -189,7 +222,6 @@ export default function QuoteApproval() {
   };
 
   const handleSubmit = async () => {
-    if (!quoteId || !token) return;
     if (!idDocFile || !idDocBase64) return;
     if (!canvasRef.current) return;
 
@@ -203,17 +235,29 @@ export default function QuoteApproval() {
     setSubmitting(true);
     try {
       const signatureDataUrl = dataUrlFromCanvas(canvasRef.current);
-      const r = await fetch(`${API_BASE}/public/quotes/${quoteId}/submit`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      const url = code
+        ? `${API_BASE}/public/q/${encodeURIComponent(code)}/submit`
+        : `${API_BASE}/public/quotes/${quoteId}/submit`;
+      const body = code
+        ? {
+          approverName: approverName.trim(),
+          signatureDataUrl,
+          idDocDataUrl: idDocBase64,
+          idDocMime: idDocFile.type || 'application/octet-stream',
+          idDocFilename: idDocFile.name,
+        }
+        : {
           token,
           approverName: approverName.trim(),
           signatureDataUrl,
           idDocDataUrl: idDocBase64,
           idDocMime: idDocFile.type || 'application/octet-stream',
           idDocFilename: idDocFile.name,
-        })
+        };
+      const r = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
       });
       const response = await r.json().catch(() => null);
       if (!r.ok || !response?.success) throw new Error(response?.error || 'No se pudo enviar la aprobación.');

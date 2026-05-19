@@ -44,11 +44,27 @@ async function ensureSchema() {
     await pool.query(`ALTER TABLE \`${table}\` ADD COLUMN \`${column}\` ${definition}`);
   };
 
+  const ensureUniqueIndex = async (table, indexName, column) => {
+    const [rows] = await pool.query(
+      `SELECT 1 as ok
+       FROM information_schema.STATISTICS
+       WHERE TABLE_SCHEMA = DATABASE()
+         AND TABLE_NAME = ?
+         AND INDEX_NAME = ?
+       LIMIT 1`,
+      [table, indexName]
+    );
+    if (rows.length) return;
+    await pool.query(`ALTER TABLE \`${table}\` ADD UNIQUE INDEX \`${indexName}\` (\`${column}\`)`);
+  };
+
   await ensureColumn('quote_approvals', 'signature_data', 'LONGTEXT NULL');
   await ensureColumn('quote_approvals', 'signature_mime', 'VARCHAR(128) NULL');
   await ensureColumn('quote_approvals', 'id_doc_data', 'LONGTEXT NULL');
   await ensureColumn('quote_approvals', 'id_doc_mime', 'VARCHAR(128) NULL');
   await ensureColumn('quote_approvals', 'id_doc_filename', 'VARCHAR(255) NULL');
+  await ensureColumn('quote_approvals', 'short_code', 'VARCHAR(32) NULL');
+  await ensureUniqueIndex('quote_approvals', 'uq_quote_approvals_short_code', 'short_code');
 }
 
 function parseDataUrl(input) {
@@ -319,8 +335,8 @@ app.post('/api/quotes/:id/approval-link', async (req, res) => {
     res.status(400).json({ success: false, error: 'Invalid quote id' });
     return;
   }
-  const token = crypto.randomBytes(32).toString('hex');
-  const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+  const shortCode = crypto.randomBytes(9).toString('base64url');
+  const tokenHash = crypto.createHash('sha256').update(shortCode).digest('hex');
 
   const conn = await pool.getConnection();
   try {
@@ -332,14 +348,14 @@ app.post('/api/quotes/:id/approval-link', async (req, res) => {
       return;
     }
     await conn.query(
-      `INSERT INTO quote_approvals (quote_id, token_hash, status)
-       VALUES (?, ?, ?)
-       ON DUPLICATE KEY UPDATE token_hash = VALUES(token_hash), status = VALUES(status)`,
-      [quoteId, tokenHash, 'LinkCreated']
+      `INSERT INTO quote_approvals (quote_id, token_hash, short_code, status)
+       VALUES (?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE token_hash = VALUES(token_hash), short_code = VALUES(short_code), status = VALUES(status)`,
+      [quoteId, tokenHash, shortCode, 'LinkCreated']
     );
     await conn.query(`UPDATE quotes SET status = ? WHERE id = ?`, ['Sent', quoteId]);
     await conn.commit();
-    res.json({ success: true, token });
+    res.json({ success: true, code: shortCode });
   } catch (e) {
     await conn.rollback();
     res.status(500).json({ success: false, error: String(e?.message || e) });
@@ -380,6 +396,37 @@ app.get('/public/quotes/:id', async (req, res) => {
   }
 });
 
+app.get('/public/q/:code', async (req, res) => {
+  const shortCode = String(req.params.code || '');
+  if (!shortCode) {
+    res.status(400).json({ success: false, error: 'Missing code' });
+    return;
+  }
+  try {
+    const [rows] = await pool.query(
+      `SELECT q.id, q.customer_name, q.tax_id, q.expiry_date, q.subtotal, q.total, q.status,
+              qa.status as approval_status
+       FROM quotes q
+       JOIN quote_approvals qa ON qa.quote_id = q.id
+       WHERE qa.short_code = ?
+       LIMIT 1`,
+      [shortCode]
+    );
+    if (!rows.length) {
+      res.status(403).json({ success: false, error: 'Invalid code' });
+      return;
+    }
+    const quoteId = rows[0].id;
+    const [items] = await pool.query(
+      `SELECT description, qty, price FROM quote_items WHERE quote_id = ? ORDER BY id ASC`,
+      [quoteId]
+    );
+    res.json({ success: true, quote: { ...rows[0], items } });
+  } catch (e) {
+    res.status(500).json({ success: false, error: String(e?.message || e) });
+  }
+});
+
 app.post('/public/quotes/:id/submit', async (req, res) => {
   const quoteId = Number(req.params.id);
   const { token, approverName, signatureDataUrl, idDocDataUrl, idDocMime, idDocFilename } = req.body || {};
@@ -401,6 +448,55 @@ app.post('/public/quotes/:id/submit', async (req, res) => {
       res.status(403).json({ success: false, error: 'Invalid token' });
       return;
     }
+    await conn.query(
+      `UPDATE quote_approvals
+       SET status = ?, approver_name = ?, approved_at = NOW(),
+           signature_data = ?, signature_mime = ?,
+           id_doc_data = ?, id_doc_mime = ?, id_doc_filename = ?
+       WHERE quote_id = ?`,
+      [
+        'PendingVerification',
+        String(approverName),
+        String(signatureDataUrl),
+        'image/png',
+        String(idDocDataUrl),
+        idDocMime ? String(idDocMime) : null,
+        idDocFilename ? String(idDocFilename) : null,
+        quoteId,
+      ]
+    );
+    await conn.query(`UPDATE quotes SET status = ? WHERE id = ?`, ['InReview', quoteId]);
+    await conn.commit();
+    res.json({ success: true });
+  } catch (e) {
+    await conn.rollback();
+    res.status(500).json({ success: false, error: String(e?.message || e) });
+  } finally {
+    conn.release();
+  }
+});
+
+app.post('/public/q/:code/submit', async (req, res) => {
+  const shortCode = String(req.params.code || '');
+  const { approverName, signatureDataUrl, idDocDataUrl, idDocMime, idDocFilename } = req.body || {};
+  if (!shortCode || !approverName || !signatureDataUrl || !idDocDataUrl) {
+    res.status(400).json({ success: false, error: 'Missing code/approverName/signatureDataUrl/idDocDataUrl' });
+    return;
+  }
+
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    const [rows] = await conn.query(
+      `SELECT quote_id FROM quote_approvals WHERE short_code = ? LIMIT 1`,
+      [shortCode]
+    );
+    if (!rows.length) {
+      await conn.rollback();
+      res.status(403).json({ success: false, error: 'Invalid code' });
+      return;
+    }
+    const quoteId = rows[0].quote_id;
     await conn.query(
       `UPDATE quote_approvals
        SET status = ?, approver_name = ?, approved_at = NOW(),
