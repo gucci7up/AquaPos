@@ -32,7 +32,7 @@ const initialUsers = [
 export default function Settings() {
     const { t, language, setLanguage, isDark, toggleDark } = useLanguage();
     const { reloadBranding } = useBranding();
-    const { businessId } = useTenant();
+    const { businessId, isAdmin } = useTenant();
     const [activeTab, setActiveTab] = useState<'general' | 'branding' | 'team' | 'integrations'>('general');
 
     // State: Business Profile
@@ -85,7 +85,11 @@ export default function Settings() {
     // Fetch settings on mount
     useEffect(() => {
         fetchSettings();
-    }, []);
+    }, [businessId]);
+
+    useEffect(() => {
+        if (!isAdmin && activeTab !== 'general') setActiveTab('general');
+    }, [isAdmin, activeTab]);
 
     const fetchSettings = async () => {
         if (!DATABASE_ID || !COLLECTION_SETTINGS_ID || !businessId) return;
@@ -137,6 +141,7 @@ export default function Settings() {
     };
 
     const handleSaveProfile = async () => {
+        if (!isAdmin) return;
         if (!DATABASE_ID || !COLLECTION_SETTINGS_ID || !businessId) {
             alert('Error: Settings Collection ID not configured');
             return;
@@ -213,6 +218,7 @@ export default function Settings() {
 
     // Upload image to Appwrite Storage → store fileId → update preview URL
     const handleFileUpload = async (key: string, e: React.ChangeEvent<HTMLInputElement>) => {
+        if (!isAdmin && key !== 'logoUrl') return;
         const file = e.target.files?.[0];
         if (!file || !BUCKET_ID) return;
 
@@ -246,6 +252,7 @@ export default function Settings() {
                     setSettingsDocId(res.$id);
                 }
             }
+            reloadBranding();
         } catch (error: any) {
             console.error('Error uploading image:', error);
             alert('Error al subir imagen: ' + (error.message || error));
@@ -274,9 +281,9 @@ export default function Settings() {
                 <div className="px-8 pt-6 border-b border-slate-200 bg-white sticky top-0 z-10">
                     <div className="flex space-x-8">
                         <TabButton id="general" label={t('settings.tabs.general')} icon="tune" active={activeTab} onClick={setActiveTab} />
-                        <TabButton id="branding" label={t('settings.tabs.branding')} icon="palette" active={activeTab} onClick={setActiveTab} />
-                        <TabButton id="team" label={t('settings.tabs.team')} icon="group" active={activeTab} onClick={setActiveTab} />
-                        <TabButton id="integrations" label={t('settings.tabs.integrations')} icon="extension" active={activeTab} onClick={setActiveTab} />
+                        {isAdmin && <TabButton id="branding" label={t('settings.tabs.branding')} icon="palette" active={activeTab} onClick={setActiveTab} />}
+                        {isAdmin && <TabButton id="team" label={t('settings.tabs.team')} icon="group" active={activeTab} onClick={setActiveTab} />}
+                        {isAdmin && <TabButton id="integrations" label={t('settings.tabs.integrations')} icon="extension" active={activeTab} onClick={setActiveTab} />}
                     </div>
                 </div>
 
@@ -286,6 +293,39 @@ export default function Settings() {
                     {activeTab === 'general' && (
                         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-300">
                             {/* Business Profile */}
+                            <section className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                                <div className="p-6 border-b border-slate-100">
+                                    <h3 className="text-lg font-bold text-slate-900">Logo</h3>
+                                    <p className="text-sm text-slate-500">Se usa en facturas, cotizaciones y dashboard.</p>
+                                </div>
+                                <div className="p-6">
+                                    <div className="flex items-center gap-4">
+                                        <div className="size-20 bg-slate-50 rounded-xl flex items-center justify-center border-2 border-dashed border-slate-200 shrink-0 overflow-hidden">
+                                            {branding.logoUrl
+                                                ? <img src={branding.logoUrl} className="w-full h-full object-contain p-1" alt="Logo" />
+                                                : <span className="material-symbols-outlined text-slate-400 text-3xl">image</span>
+                                            }
+                                        </div>
+                                        <div className="flex flex-col gap-2 flex-1">
+                                            <label className={`cursor-pointer flex items-center gap-2 px-4 py-2 text-white text-sm font-bold rounded-lg transition-all w-fit ${uploadingKey === 'logoUrl' ? 'bg-primary/60 cursor-wait' : 'bg-primary hover:brightness-105'}`}>
+                                                <span className={`material-symbols-outlined text-sm ${uploadingKey === 'logoUrl' ? 'animate-spin' : ''}`}>
+                                                    {uploadingKey === 'logoUrl' ? 'sync' : 'upload'}
+                                                </span>
+                                                {uploadingKey === 'logoUrl' ? 'Subiendo...' : 'Subir logo'}
+                                                <input
+                                                    type="file"
+                                                    accept="image/*"
+                                                    className="hidden"
+                                                    onChange={(e) => handleFileUpload('logoUrl', e)}
+                                                />
+                                            </label>
+                                            <p className="text-xs text-slate-400">PNG, JPG, SVG · Recomendado 200×200px</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </section>
+
+                            {isAdmin && (
                             <section className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
                                 <div className="p-6 border-b border-slate-100">
                                     <h3 className="text-lg font-bold text-slate-900">{t('settings.businessProfile')}</h3>
@@ -369,6 +409,7 @@ export default function Settings() {
                                     </button>
                                 </div>
                             </section>
+                            )}
 
                             {/* Global Preferences */}
                             <section className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
@@ -418,7 +459,7 @@ export default function Settings() {
                     )}
 
                     {/* ... (Branding Tab content remains the same) ... */}
-                    {activeTab === 'branding' && (
+                    {isAdmin && activeTab === 'branding' && (
                         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-300">
                             <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
                                 <div className="p-6 border-b border-slate-100">
