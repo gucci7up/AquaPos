@@ -198,11 +198,19 @@ export default function Quotes() {
         FUNCTION_QUOTE_APPROVAL_ID,
         JSON.stringify({ action: 'createLink', quoteId: id })
       );
-      const response = JSON.parse(execution.responseBody || '{}');
-      if (!response.success) throw new Error(response.error || 'No se pudo generar el link.');
+      const raw = execution.responseBody || '';
+      let response: any = null;
+      try { response = JSON.parse(raw); } catch { response = null; }
+      if (!response?.success || !response?.token) {
+        throw new Error(response?.error || raw || 'No se pudo generar el link.');
+      }
       const link = `${window.location.origin}/quote/${id}/approve?token=${response.token}`;
-      await navigator.clipboard.writeText(link);
-      alert('Link copiado al portapapeles:\n\n' + link);
+      try {
+        await navigator.clipboard.writeText(link);
+        alert('Link copiado al portapapeles:\n\n' + link);
+      } catch {
+        window.prompt('Copia este link y envíaselo al cliente:', link);
+      }
       fetchQuotes();
     } catch (e: any) {
       alert('Error: ' + (e?.message || 'No se pudo generar el link.'));
