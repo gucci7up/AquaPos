@@ -30,7 +30,33 @@
 </head>
 
 <body class="bg-background-light text-slate-900 antialiased">
-  <div id="root"></div>
+  <div id="root">
+    <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;">
+      <div style="max-width:520px;width:100%;background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:20px;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <div style="width:44px;height:44px;border-radius:12px;background:#13daec;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:900;">A</div>
+          <div>
+            <div style="font-weight:900;color:#0f172a;font-size:18px;line-height:1.1;">AquaPos</div>
+            <div style="color:#64748b;font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;margin-top:2px;">Cargando</div>
+          </div>
+        </div>
+        <div id="boot-status" style="margin-top:14px;color:#475569;font-size:13px;line-height:1.4;">
+          Preparando la aplicación…
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>
+    (function () {
+      var root = document.getElementById('root');
+      var status = document.getElementById('boot-status');
+      if (!root || !status) return;
+      window.setTimeout(function () {
+        if (root.getAttribute('data-mounted') === '1') return;
+        status.textContent = 'No se pudo cargar la app. Prueba Ctrl+F5 (o modo incógnito). Si continúa, revisa consola del navegador (F12) o confirma que el deploy terminó.';
+      }, 7000);
+    })();
+  </script>
 </body>
 
 </html>

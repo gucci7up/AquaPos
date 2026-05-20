@@ -14,3 +14,4 @@ root.render(
     <App />
   </React.StrictMode>
 );
+rootElement.setAttribute('data-mounted', '1');
