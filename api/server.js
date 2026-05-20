@@ -572,8 +572,8 @@ app.get('/api/quotes', async (req, res) => {
       await conn.query(`UPDATE quotes SET business_id = ? WHERE business_id IS NULL`, [businessId]);
       const [rows] = await conn.query(
         `SELECT
-          q.id, q.customer_name, q.tax_id, q.expiry_date, q.subtotal, q.total, q.status,
-          qa.status as approval_status, qa.approver_name, qa.approved_at, qa.signature_path, qa.id_doc_path
+          q.id, q.customer_name, q.tax_id, q.expiry_date, q.subtotal, q.total, q.status, q.created_at, q.updated_at,
+          qa.status as approval_status, qa.approver_name, qa.approved_at, qa.verified_at
          FROM quotes q
          LEFT JOIN quote_approvals qa ON qa.quote_id = q.id
          WHERE q.business_id = ?

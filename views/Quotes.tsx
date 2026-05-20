@@ -51,8 +51,8 @@ export default function Quotes() {
         approvalName: row.approver_name,
         approvalAt: row.approved_at,
         items: [],
-        date: row.created_at,
-        $createdAt: row.created_at
+        date: row.created_at || row.updated_at,
+        $createdAt: row.created_at || row.updated_at
       }));
       setQuotes(mapped);
     } catch (error) {
@@ -102,6 +102,12 @@ export default function Quotes() {
   const fmtMoney = (val: any) => {
     const n = Number(val) || 0;
     return new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
+  };
+
+  const fmtDate = (val: any) => {
+    const d = new Date(val);
+    if (Number.isNaN(d.getTime())) return '—';
+    return d.toLocaleDateString();
   };
 
   // CRUD Handlers
@@ -485,7 +491,7 @@ export default function Quotes() {
                     <QuoteRow
                       key={quote.id}
                       id={quote.id}
-                      created={new Date(quote.date || quote.$createdAt).toLocaleDateString()}
+                      created={fmtDate(quote.date || quote.$createdAt)}
                       customer={quote.customerName || quote.customer}
                       taxId={quote.taxId}
                       amount={`$${fmtMoney(totalAmt)}`}
