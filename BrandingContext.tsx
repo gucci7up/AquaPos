@@ -18,6 +18,7 @@ const buildFileUrl = (fileId: string | null | undefined) => {
 export interface BrandingConfig {
     businessName: string;
     logoUrl: string;   // full preview URL (ready for <img src>)
+    faviconUrl: string;
     primaryColor: string;   // e.g. '#13daec'
     address: string;
     phone: string;
@@ -41,6 +42,7 @@ interface BrandingContextValue {
 const defaults: BrandingConfig = {
     businessName: 'AquaPos',
     logoUrl: '',
+    faviconUrl: '',
     primaryColor: '#13daec',
     address: '',
     phone: '',
@@ -66,6 +68,17 @@ export const BrandingProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const [branding, setBranding] = useState<BrandingConfig>(defaults);
     const { businessId } = useTenant();
 
+    const applyFavicon = (href: string) => {
+        if (!href) return;
+        const head = document.head || document.getElementsByTagName('head')[0];
+        if (!head) return;
+        const existing = head.querySelector('link[rel="icon"]') as HTMLLinkElement | null;
+        const link = existing || (document.createElement('link') as HTMLLinkElement);
+        link.rel = 'icon';
+        link.href = href;
+        if (!existing) head.appendChild(link);
+    };
+
     const loadBranding = async () => {
         if (!DB) return;
         let effectiveBusinessId = businessId || null;
@@ -87,6 +100,7 @@ export const BrandingProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             const config: BrandingConfig = {
                 businessName: d.businessName || d.name || defaults.businessName,
                 logoUrl: buildFileUrl(d.branding_logoUrl),
+                faviconUrl: buildFileUrl(d.branding_favicon),
                 primaryColor: d.branding_primaryColor || defaults.primaryColor,
                 address: d.address || '',
                 phone: d.phone || '',
@@ -104,6 +118,7 @@ export const BrandingProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             setBranding(config);
 
             document.documentElement.style.setProperty('--color-primary', config.primaryColor);
+            applyFavicon(config.faviconUrl);
 
         } catch (e) {
             console.warn('[BrandingContext] Could not load settings:', e);

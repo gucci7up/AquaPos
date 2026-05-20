@@ -51,13 +51,14 @@ export default function Settings() {
     const [branding, setBranding] = useState({
         loginBg: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?q=80&w=2070&auto=format&fit=crop',
         logoUrl: '',
+        favicon: '',
         primaryColor: '#13daec',
         landingHero: 'https://lh3.googleusercontent.com/aida-public/AB6AXuA7lYcDqoIsNqzIvtzR5LqLXZ4JlKkCRqIagznKEbsvnI6pQ0x3chrwmsp2U2cowE7Ll7tO1aysWfCu6OAs8JWAmc3l7dTPPSPlpAo47gaVg6U8y2iE797oWUBO7ciQyHbV12LoYTMIPIG8GMEZd9lTyZvzWK_ruTQvnXT0-mnS1ALu5_BS9IBUSudsfL_KcDvFjHWumWoiUFxNRQHnf0DoZ7rRh823k53HIdQDHsKEFehywkn_mMIGNhvfoyrX86Qwx8nLDCcVw3s',
         landingFeature: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBWvk9CAUtPBscww0R9xdnm16iCqTl3vQGzRcMDKb3AkQXIrubU3SwcHYdhUU41WiP2xhBPSZ3eTSeBHgAmArSU4b3y3-SBg3LgvQWtyr1YiUuMxCOXU4oAUQ5xgFWsHahkNg0berzKsxAomp43EQs9flRJVbHnlYxhEfKQNvTI4VU7J8dg5rEiY5qewE8Sw7PWbzcP2PO8Ds0LPhwuthyMeF-wdGACHbd5ZmTdiRlNLV42wfTy31U0QxmBqpdcsVYtVdvda09XJx8'
     });
     // Stores the Appwrite Storage file IDs for each branding image (for persistence)
     const [brandingFileIds, setBrandingFileIds] = useState<Record<string, string>>({
-        loginBg: '', logoUrl: '', landingHero: '', landingFeature: ''
+        loginBg: '', logoUrl: '', favicon: '', landingHero: '', landingFeature: ''
     });
     // Track which image slot is currently uploading
     const [uploadingKey, setUploadingKey] = useState<string | null>(null);
@@ -112,7 +113,7 @@ export default function Settings() {
                 // Restore saved file IDs and rebuild preview URLs
                 const savedIds: Record<string, string> = {};
                 const savedUrls: Partial<typeof branding> = {};
-                (['logoUrl', 'loginBg', 'landingHero', 'landingFeature'] as const).forEach(key => {
+                (['logoUrl', 'favicon', 'loginBg', 'landingHero', 'landingFeature'] as const).forEach(key => {
                     const fileId = doc[`branding_${key}`];
                     if (fileId) {
                         savedIds[key] = fileId;
@@ -155,6 +156,7 @@ export default function Settings() {
                 businessId,
                 branding_logoUrl: brandingFileIds.logoUrl || null,
                 branding_loginBg: brandingFileIds.loginBg || null,
+                branding_favicon: brandingFileIds.favicon || null,
                 branding_landingHero: brandingFileIds.landingHero || null,
                 branding_landingFeature: brandingFileIds.landingFeature || null,
                 branding_primaryColor: branding.primaryColor,
@@ -299,27 +301,63 @@ export default function Settings() {
                                     <p className="text-sm text-slate-500">Se usa en facturas, cotizaciones y dashboard.</p>
                                 </div>
                                 <div className="p-6">
-                                    <div className="flex items-center gap-4">
-                                        <div className="size-20 bg-slate-50 rounded-xl flex items-center justify-center border-2 border-dashed border-slate-200 shrink-0 overflow-hidden">
-                                            {branding.logoUrl
-                                                ? <img src={branding.logoUrl} className="w-full h-full object-contain p-1" alt="Logo" />
-                                                : <span className="material-symbols-outlined text-slate-400 text-3xl">image</span>
-                                            }
+                                    <div className="flex flex-col md:flex-row md:items-start gap-6">
+                                        <div className="flex items-start gap-4">
+                                            <div className="space-y-2">
+                                                <div className="text-xs font-bold text-slate-400 uppercase tracking-widest">Logo</div>
+                                                <div className="size-20 bg-slate-50 rounded-xl flex items-center justify-center border-2 border-dashed border-slate-200 shrink-0 overflow-hidden">
+                                                    {branding.logoUrl
+                                                        ? <img src={branding.logoUrl} className="w-full h-full object-contain p-1" alt="Logo" />
+                                                        : <span className="material-symbols-outlined text-slate-400 text-3xl">image</span>
+                                                    }
+                                                </div>
+                                            </div>
+
+                                            {isAdmin && (
+                                                <div className="space-y-2">
+                                                    <div className="text-xs font-bold text-slate-400 uppercase tracking-widest">Favicon</div>
+                                                    <div className="size-20 bg-slate-50 rounded-xl flex items-center justify-center border-2 border-dashed border-slate-200 shrink-0 overflow-hidden">
+                                                        {branding.favicon
+                                                            ? <img src={branding.favicon} className="w-full h-full object-contain p-4" alt="Favicon" />
+                                                            : <span className="material-symbols-outlined text-slate-400 text-3xl">bookmark</span>
+                                                        }
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
+
                                         <div className="flex flex-col gap-2 flex-1">
-                                            <label className={`cursor-pointer flex items-center gap-2 px-4 py-2 text-white text-sm font-bold rounded-lg transition-all w-fit ${uploadingKey === 'logoUrl' ? 'bg-primary/60 cursor-wait' : 'bg-primary hover:brightness-105'}`}>
-                                                <span className={`material-symbols-outlined text-sm ${uploadingKey === 'logoUrl' ? 'animate-spin' : ''}`}>
-                                                    {uploadingKey === 'logoUrl' ? 'sync' : 'upload'}
-                                                </span>
-                                                {uploadingKey === 'logoUrl' ? 'Subiendo...' : 'Subir logo'}
-                                                <input
-                                                    type="file"
-                                                    accept="image/*"
-                                                    className="hidden"
-                                                    onChange={(e) => handleFileUpload('logoUrl', e)}
-                                                />
-                                            </label>
-                                            <p className="text-xs text-slate-400">PNG, JPG, SVG · Recomendado 200×200px</p>
+                                            <div className="flex flex-wrap items-center gap-2">
+                                                <label className={`cursor-pointer flex items-center gap-2 px-4 py-2 text-white text-sm font-bold rounded-lg transition-all w-fit ${uploadingKey === 'logoUrl' ? 'bg-primary/60 cursor-wait' : 'bg-primary hover:brightness-105'}`}>
+                                                    <span className={`material-symbols-outlined text-sm ${uploadingKey === 'logoUrl' ? 'animate-spin' : ''}`}>
+                                                        {uploadingKey === 'logoUrl' ? 'sync' : 'upload'}
+                                                    </span>
+                                                    {uploadingKey === 'logoUrl' ? 'Subiendo...' : 'Subir logo'}
+                                                    <input
+                                                        type="file"
+                                                        accept="image/*"
+                                                        className="hidden"
+                                                        onChange={(e) => handleFileUpload('logoUrl', e)}
+                                                    />
+                                                </label>
+
+                                                {isAdmin && (
+                                                    <label className={`cursor-pointer flex items-center gap-2 px-4 py-2 text-white text-sm font-bold rounded-lg transition-all w-fit ${uploadingKey === 'favicon' ? 'bg-slate-700/60 cursor-wait' : 'bg-slate-900 hover:bg-slate-800'}`}>
+                                                        <span className={`material-symbols-outlined text-sm ${uploadingKey === 'favicon' ? 'animate-spin' : ''}`}>
+                                                            {uploadingKey === 'favicon' ? 'sync' : 'upload'}
+                                                        </span>
+                                                        {uploadingKey === 'favicon' ? 'Subiendo...' : 'Subir favicon'}
+                                                        <input
+                                                            type="file"
+                                                            accept="image/png,image/svg+xml,image/x-icon"
+                                                            className="hidden"
+                                                            onChange={(e) => handleFileUpload('favicon', e)}
+                                                        />
+                                                    </label>
+                                                )}
+                                            </div>
+                                            <p className="text-xs text-slate-400">Logo: PNG, JPG, SVG · Recomendado 200×200px</p>
+                                            {isAdmin && <p className="text-xs text-slate-400">Favicon: PNG, SVG, ICO · Recomendado 64×64px (se aplica al navegador).</p>}
                                         </div>
                                     </div>
                                 </div>
@@ -482,11 +520,19 @@ export default function Settings() {
                                                 <label className="text-sm font-bold text-slate-700 block">Logo de la Marca</label>
                                                 <div className="flex items-center gap-4">
                                                     {/* Preview */}
-                                                    <div className="size-20 bg-slate-50 rounded-xl flex items-center justify-center border-2 border-dashed border-slate-200 shrink-0 overflow-hidden">
-                                                        {branding.logoUrl
-                                                            ? <img src={branding.logoUrl} className="w-full h-full object-contain p-1" alt="Logo" />
-                                                            : <span className="material-symbols-outlined text-slate-400 text-3xl">image</span>
-                                                        }
+                                                    <div className="flex items-center gap-3 shrink-0">
+                                                        <div className="size-20 bg-slate-50 rounded-xl flex items-center justify-center border-2 border-dashed border-slate-200 overflow-hidden">
+                                                            {branding.logoUrl
+                                                                ? <img src={branding.logoUrl} className="w-full h-full object-contain p-1" alt="Logo" />
+                                                                : <span className="material-symbols-outlined text-slate-400 text-3xl">image</span>
+                                                            }
+                                                        </div>
+                                                        <div className="size-20 bg-slate-50 rounded-xl flex items-center justify-center border-2 border-dashed border-slate-200 overflow-hidden">
+                                                            {branding.favicon
+                                                                ? <img src={branding.favicon} className="w-full h-full object-contain p-4" alt="Favicon" />
+                                                                : <span className="material-symbols-outlined text-slate-400 text-3xl">bookmark</span>
+                                                            }
+                                                        </div>
                                                     </div>
                                                     {/* Upload controls */}
                                                     <div className="flex flex-col gap-2 flex-1">
@@ -503,6 +549,20 @@ export default function Settings() {
                                                             />
                                                         </label>
                                                         <p className="text-xs text-slate-400">PNG, JPG, SVG · Recomendado 200×200px</p>
+
+                                                        <label className={`cursor-pointer flex items-center gap-2 px-4 py-2 text-white text-sm font-bold rounded-lg transition-all w-fit ${uploadingKey === 'favicon' ? 'bg-slate-700/60 cursor-wait' : 'bg-slate-900 hover:bg-slate-800'}`}>
+                                                            <span className={`material-symbols-outlined text-sm ${uploadingKey === 'favicon' ? 'animate-spin' : ''}`}>
+                                                                {uploadingKey === 'favicon' ? 'sync' : 'upload'}
+                                                            </span>
+                                                            {uploadingKey === 'favicon' ? 'Subiendo...' : 'Subir favicon'}
+                                                            <input
+                                                                type="file"
+                                                                accept="image/png,image/svg+xml,image/x-icon"
+                                                                className="hidden"
+                                                                onChange={(e) => handleFileUpload('favicon', e)}
+                                                            />
+                                                        </label>
+                                                        <p className="text-xs text-slate-400">Favicon: PNG, SVG, ICO · Recomendado 64×64px</p>
                                                         {branding.logoUrl && (
                                                             <button
                                                                 onClick={() => handleBrandingChange('logoUrl', '')}
