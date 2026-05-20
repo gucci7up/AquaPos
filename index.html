@@ -51,9 +51,59 @@
       var root = document.getElementById('root');
       var status = document.getElementById('boot-status');
       if (!root || !status) return;
+      var last = '';
+      function setStatus(text) {
+        if (!text || text === last) return;
+        last = text;
+        status.textContent = text;
+      }
+
+      window.addEventListener('unhandledrejection', function (e) {
+        try {
+          var reason = e && e.reason ? (e.reason.message || String(e.reason)) : 'Unknown error';
+          setStatus('Error de la app: ' + reason);
+        } catch { }
+      });
+      window.addEventListener('error', function (e) {
+        try {
+          var msg = e && e.message ? String(e.message) : '';
+          var file = e && e.filename ? String(e.filename) : '';
+          if (msg || file) setStatus('Error cargando la app: ' + (msg || file));
+        } catch { }
+      }, true);
+
+      function isMounted() {
+        return root.getAttribute('data-mounted') === '1';
+      }
+
       window.setTimeout(function () {
-        if (root.getAttribute('data-mounted') === '1') return;
-        status.textContent = 'No se pudo cargar la app. Prueba Ctrl+F5 (o modo incógnito). Si continúa, revisa consola del navegador (F12) o confirma que el deploy terminó.';
+        if (isMounted()) return;
+        var s = document.querySelector('script[type="module"][src]');
+        var src = s ? s.getAttribute('src') : '';
+        if (src) {
+          setStatus('Cargando la app… (script: ' + src + ')');
+          try {
+            fetch(src, { cache: 'no-store' }).then(function (r) {
+              if (isMounted()) return;
+              var ct = r.headers && r.headers.get ? r.headers.get('content-type') : '';
+              if (!r.ok) {
+                setStatus('No se pudo cargar el script (' + r.status + '). Revisa el deploy y que /assets esté disponible.');
+                return;
+              }
+              if (ct && ct.indexOf('text/html') !== -1) {
+                setStatus('El script se está sirviendo como HTML. Esto pasa cuando el frontend NO está compilado o la ruta cae a index.html. Revisa el deploy (build) en Dokploy.');
+                return;
+              }
+            }).catch(function () {
+              if (isMounted()) return;
+              setStatus('No se pudo descargar el script. Revisa red/DNS/SSL o el deploy.');
+            });
+          } catch { }
+        }
+      }, 2000);
+      window.setTimeout(function () {
+        if (isMounted()) return;
+        setStatus('No se pudo cargar la app. Prueba Ctrl+F5 (o modo incógnito). Si continúa, revisa consola del navegador (F12) o confirma que el deploy terminó.');
       }, 7000);
     })();
   </script>
