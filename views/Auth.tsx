@@ -1,18 +1,16 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../LanguageContext';
-import { account, ID } from '@/lib/appwrite';
+import { account } from '@/lib/appwrite';
 import { useBranding } from '../BrandingContext';
 
 export default function Auth() {
     const { t, language, setLanguage } = useLanguage();
     const { branding } = useBranding();
     const navigate = useNavigate();
-    const [mode, setMode] = useState<'login' | 'register'>('login');
     const [loading, setLoading] = useState(false);
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
-    const [name, setName] = useState('');
     const [error, setError] = useState<string | null>(null);
 
 
@@ -22,9 +20,6 @@ export default function Auth() {
         setError(null);
 
         try {
-            if (mode === 'register') {
-                await account.create(ID.unique(), email, password, name);
-            }
             await account.createEmailPasswordSession(email, password);
             navigate('/dashboard');
         } catch (err: any) {
@@ -87,10 +82,10 @@ export default function Auth() {
                             </div>
                         </div>
                         <h2 className="text-3xl font-black text-slate-900 tracking-tight mb-2">
-                            {mode === 'login' ? t('auth.welcomeBack') : t('auth.createAccount')}
+                            {t('auth.welcomeBack')}
                         </h2>
                         <p className="text-slate-500">
-                            {mode === 'login' ? 'Access your store dashboard' : 'Launch your online business today'}
+                            Access your store dashboard
                         </p>
                     </div>
 
@@ -98,24 +93,6 @@ export default function Auth() {
                         {error && (
                             <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-xl text-sm font-medium">
                                 {error}
-                            </div>
-                        )}
-
-                        {mode === 'register' && (
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-1">
-                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">{t('auth.fullName')}</label>
-                                    <input
-                                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:border-[#13daec] focus:ring-1 focus:ring-[#13daec] outline-none transition-all"
-                                        placeholder="Juan Pérez"
-                                        value={name}
-                                        onChange={(e) => setName(e.target.value)}
-                                    />
-                                </div>
-                                <div className="space-y-1">
-                                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">{t('auth.companyName')}</label>
-                                    <input className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:border-[#13daec] focus:ring-1 focus:ring-[#13daec] outline-none transition-all" placeholder="Boutique Name" />
-                                </div>
                             </div>
                         )}
 
@@ -154,7 +131,7 @@ export default function Auth() {
                             {loading ? (
                                 <span className="size-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
                             ) : (
-                                mode === 'login' ? t('auth.login') : t('auth.register')
+                                t('auth.login')
                             )}
                         </button>
                     </form>
@@ -182,13 +159,7 @@ export default function Auth() {
                     </button>
 
                     <p className="mt-8 text-center text-sm text-slate-500">
-                        {mode === 'login' ? t('auth.noAccount') : t('auth.hasAccount')}
-                        <button
-                            onClick={() => setMode(mode === 'login' ? 'register' : 'login')}
-                            className="ml-2 font-bold text-[#13daec] hover:underline"
-                        >
-                            {mode === 'login' ? t('auth.signUp') : t('auth.signIn')}
-                        </button>
+                        Sistema privado: solicita al Admin que cree tu usuario o te invite con tu correo.
                     </p>
                 </div>
             </div>

@@ -182,18 +182,21 @@ const MenuGridItem = ({ to, icon, label, color, onClick }: any) => {
 }
 
 const RequireAuth = ({ children }: { children: React.ReactNode }) => {
-  const { loading, user, profile } = useTenant();
+  const { loading, user, profile, authError } = useTenant();
   const location = useLocation();
   const navigate = useNavigate();
   if (loading) return null;
   if (!user) return <Navigate to="/login" replace state={{ from: location.pathname }} />;
   if (!profile) {
+    const isDenied = String(authError || '').toLowerCase().includes('access denied');
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
         <div className="bg-white w-full max-w-lg rounded-2xl border border-slate-200 shadow-sm p-6">
-          <h2 className="text-lg font-bold text-slate-900">Usuario sin negocio asignado</h2>
+          <h2 className="text-lg font-bold text-slate-900">{isDenied ? 'Acceso denegado' : 'Usuario sin negocio asignado'}</h2>
           <p className="text-sm text-slate-500 mt-2">
-            Tu usuario está creado, pero no tiene un negocio asignado todavía. Entra con el usuario Admin y asígnalo desde “Usuarios”.
+            {isDenied
+              ? 'Este sistema es privado. Tu correo no está autorizado. Pide al Admin que te invite y te asigne a un negocio.'
+              : 'Tu usuario está creado, pero no tiene un negocio asignado todavía. Entra con el usuario Admin y asígnalo desde “Usuarios”.'}
           </p>
           <div className="mt-6 flex justify-end">
             <button
