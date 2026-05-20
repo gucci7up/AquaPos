@@ -110,9 +110,7 @@ export default function Auth() {
                         <div className="space-y-1">
                             <div className="flex justify-between items-center">
                                 <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">{t('auth.password')}</label>
-                                {mode === 'login' && (
-                                    <button type="button" className="text-xs font-bold text-[#13daec] hover:underline">{t('auth.forgotPassword')}</button>
-                                )}
+                                <button type="button" className="text-xs font-bold text-[#13daec] hover:underline">{t('auth.forgotPassword')}</button>
                             </div>
                             <input
                                 type="password"
