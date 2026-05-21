@@ -68,16 +68,17 @@ export default function QuoteApproval() {
       if (!canvas) return;
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
-      const rect = canvas.getBoundingClientRect();
-      ctx.clearRect(0, 0, rect.width, rect.height);
+      const w = canvas.width || 1;
+      const h = canvas.height || 1;
+      ctx.clearRect(0, 0, w, h);
       for (const stroke of strokesRef.current) {
         if (stroke.length < 1) continue;
         for (let i = 1; i < stroke.length; i++) {
           const a = stroke[i - 1];
           const b = stroke[i];
           ctx.beginPath();
-          ctx.moveTo(a.x * rect.width, a.y * rect.height);
-          ctx.lineTo(b.x * rect.width, b.y * rect.height);
+          ctx.moveTo(a.x * w, a.y * h);
+          ctx.lineTo(b.x * w, b.y * h);
           ctx.stroke();
         }
       }
@@ -89,10 +90,9 @@ export default function QuoteApproval() {
       const rect = canvas.getBoundingClientRect();
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
-      const dpr = Math.max(1, Math.floor(window.devicePixelRatio || 1));
-      canvas.width = Math.max(1, Math.floor(rect.width * dpr));
-      canvas.height = Math.max(1, Math.floor(rect.height * dpr));
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      canvas.width = Math.max(1, Math.floor(rect.width));
+      canvas.height = Math.max(1, Math.floor(rect.height));
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
       ctx.lineWidth = 3;
@@ -189,14 +189,16 @@ export default function QuoteApproval() {
     const ox = ne?.offsetX ?? (e as any).offsetX;
     const oy = ne?.offsetY ?? (e as any).offsetY;
     if (typeof ox === 'number' && typeof oy === 'number') {
-      return { x: ox, y: oy };
+      const x = Math.min(Math.max(0, ox), canvas.width);
+      const y = Math.min(Math.max(0, oy), canvas.height);
+      return { x, y };
     }
     const rect = canvas.getBoundingClientRect();
     const clientX = (e as any).clientX;
     const clientY = (e as any).clientY;
     if (typeof clientX !== 'number' || typeof clientY !== 'number') return null;
-    const x = Math.min(Math.max(0, clientX - rect.left), rect.width);
-    const y = Math.min(Math.max(0, clientY - rect.top), rect.height);
+    const x = Math.min(Math.max(0, clientX - rect.left), canvas.width);
+    const y = Math.min(Math.max(0, clientY - rect.top), canvas.height);
     return { x, y };
   };
 
@@ -216,8 +218,7 @@ export default function QuoteApproval() {
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-    const rect = canvas.getBoundingClientRect();
-    ctx.clearRect(0, 0, rect.width, rect.height);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
     lastPointRef.current = null;
     strokesRef.current = [];
     setSignatureVersion(v => v + 1);
@@ -236,16 +237,17 @@ export default function QuoteApproval() {
     strokesRef.current = strokesRef.current.slice(0, -1);
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-    const rect = canvas.getBoundingClientRect();
-    ctx.clearRect(0, 0, rect.width, rect.height);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const w = canvas.width || 1;
+    const h = canvas.height || 1;
     for (const stroke of strokesRef.current) {
       if (stroke.length < 1) continue;
       for (let i = 1; i < stroke.length; i++) {
         const a = stroke[i - 1];
         const b = stroke[i];
         ctx.beginPath();
-        ctx.moveTo(a.x * rect.width, a.y * rect.height);
-        ctx.lineTo(b.x * rect.width, b.y * rect.height);
+        ctx.moveTo(a.x * w, a.y * h);
+        ctx.lineTo(b.x * w, b.y * h);
         ctx.stroke();
       }
     }
@@ -417,7 +419,7 @@ export default function QuoteApproval() {
                     </div>
                     <canvas
                       ref={canvasRef}
-                      className="w-full h-[260px] touch-none"
+                      className="block w-full h-[260px] touch-none"
                       style={{ touchAction: 'none' }}
                       onPointerDown={(e) => {
                         e.preventDefault();
@@ -427,8 +429,7 @@ export default function QuoteApproval() {
                         if (p) {
                           const canvas = canvasRef.current;
                           if (canvas) {
-                            const rect = canvas.getBoundingClientRect();
-                            const pn = { x: rect.width ? p.x / rect.width : 0, y: rect.height ? p.y / rect.height : 0 };
+                            const pn = { x: canvas.width ? p.x / canvas.width : 0, y: canvas.height ? p.y / canvas.height : 0 };
                             strokesRef.current = [...strokesRef.current, [pn]];
                           }
                         }
@@ -443,8 +444,7 @@ export default function QuoteApproval() {
                         lastPointRef.current = p;
                         const canvas = canvasRef.current;
                         if (canvas) {
-                          const rect = canvas.getBoundingClientRect();
-                          const pn = { x: rect.width ? p.x / rect.width : 0, y: rect.height ? p.y / rect.height : 0 };
+                          const pn = { x: canvas.width ? p.x / canvas.width : 0, y: canvas.height ? p.y / canvas.height : 0 };
                           const strokes = strokesRef.current.slice();
                           const last = strokes[strokes.length - 1] || null;
                           if (last) {
