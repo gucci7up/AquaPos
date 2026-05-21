@@ -185,6 +185,12 @@ export default function QuoteApproval() {
   const getLocalPoint = (e: PointerEvent | React.PointerEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
     if (!canvas) return null;
+    const ne = (e as any).nativeEvent;
+    const ox = ne?.offsetX ?? (e as any).offsetX;
+    const oy = ne?.offsetY ?? (e as any).offsetY;
+    if (typeof ox === 'number' && typeof oy === 'number') {
+      return { x: ox, y: oy };
+    }
     const rect = canvas.getBoundingClientRect();
     const clientX = (e as any).clientX;
     const clientY = (e as any).clientY;
