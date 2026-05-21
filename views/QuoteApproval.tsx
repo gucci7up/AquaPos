@@ -19,11 +19,61 @@ function fmt(n: number) {
   return (Number(n) || 0).toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-function dataUrlFromCanvas(canvas: HTMLCanvasElement) {
-  return canvas.toDataURL('image/png');
+type PointN = { x: number; y: number };
+
+const SIG_W = 1000;
+const SIG_H = 300;
+
+function buildStrokePath(points: PointN[]) {
+  if (!points.length) return '';
+  if (points.length === 1) {
+    const p = points[0];
+    return `M ${p.x} ${p.y} L ${p.x + 0.01} ${p.y + 0.01}`;
+  }
+  let d = `M ${points[0].x} ${points[0].y}`;
+  for (let i = 1; i < points.length; i++) {
+    const p = points[i];
+    d += ` L ${p.x} ${p.y}`;
+  }
+  return d;
 }
 
-type PointN = { x: number; y: number };
+async function signatureToPngDataUrl(strokes: PointN[][]) {
+  const paths = strokes
+    .filter(s => s.length)
+    .map(s => `<path d="${buildStrokePath(s)}" fill="none" stroke="#0f172a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />`)
+    .join('');
+
+  const svg = `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="${SIG_W}" height="${SIG_H}" viewBox="0 0 ${SIG_W} ${SIG_H}">
+  <rect width="100%" height="100%" fill="#ffffff" />
+  ${paths}
+</svg>`;
+
+  const blob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  try {
+    const img = new Image();
+    img.decoding = 'async';
+    const loaded = new Promise<void>((resolve, reject) => {
+      img.onload = () => resolve();
+      img.onerror = () => reject(new Error('No se pudo generar la firma.'));
+    });
+    img.src = url;
+    await loaded;
+    const canvas = document.createElement('canvas');
+    canvas.width = SIG_W;
+    canvas.height = SIG_H;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('No se pudo generar la firma.');
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, SIG_W, SIG_H);
+    ctx.drawImage(img, 0, 0);
+    return canvas.toDataURL('image/png');
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
 
 export default function QuoteApproval() {
   const { language } = useLanguage();
@@ -41,11 +91,9 @@ export default function QuoteApproval() {
   const [idDocPreviewName, setIdDocPreviewName] = useState<string | null>(null);
   const [idDocBase64, setIdDocBase64] = useState<string | null>(null);
 
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const svgRef = useRef<SVGSVGElement | null>(null);
   const drawingRef = useRef(false);
-  const lastPointRef = useRef<{ x: number; y: number } | null>(null);
-  const strokesRef = useRef<PointN[][]>([]);
-  const [signatureVersion, setSignatureVersion] = useState(0);
+  const [strokes, setStrokes] = useState<PointN[][]>([]);
 
   const canSubmit = useMemo(() => {
     if (code) return Boolean(code && approverName.trim() && idDocBase64);
@@ -61,54 +109,6 @@ export default function QuoteApproval() {
       return sum + qty * price;
     }, 0);
   }, [quote]);
-
-  useEffect(() => {
-    const redraw = () => {
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
-      const w = canvas.width || 1;
-      const h = canvas.height || 1;
-      ctx.clearRect(0, 0, w, h);
-      for (const stroke of strokesRef.current) {
-        if (stroke.length < 1) continue;
-        for (let i = 1; i < stroke.length; i++) {
-          const a = stroke[i - 1];
-          const b = stroke[i];
-          ctx.beginPath();
-          ctx.moveTo(a.x * w, a.y * h);
-          ctx.lineTo(b.x * w, b.y * h);
-          ctx.stroke();
-        }
-      }
-    };
-
-    const setupCanvas = () => {
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-      const rect = canvas.getBoundingClientRect();
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
-      canvas.width = Math.max(1, Math.floor(rect.width));
-      canvas.height = Math.max(1, Math.floor(rect.height));
-      ctx.setTransform(1, 0, 0, 1, 0, 0);
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-      ctx.lineWidth = 3;
-      ctx.strokeStyle = '#0f172a';
-      redraw();
-    };
-
-    setupCanvas();
-    const ro = new ResizeObserver(() => setupCanvas());
-    if (canvasRef.current) ro.observe(canvasRef.current);
-    window.addEventListener('resize', setupCanvas);
-    return () => {
-      ro.disconnect();
-      window.removeEventListener('resize', setupCanvas);
-    };
-  }, []);
 
   useEffect(() => {
     const load = async () => {
@@ -182,76 +182,30 @@ export default function QuoteApproval() {
     load();
   }, [quoteId, token, code]);
 
-  const getLocalPoint = (e: PointerEvent | React.PointerEvent<HTMLCanvasElement>) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return null;
-    const ne = (e as any).nativeEvent;
-    const ox = ne?.offsetX ?? (e as any).offsetX;
-    const oy = ne?.offsetY ?? (e as any).offsetY;
-    if (typeof ox === 'number' && typeof oy === 'number') {
-      const x = Math.min(Math.max(0, ox), canvas.width);
-      const y = Math.min(Math.max(0, oy), canvas.height);
-      return { x, y };
-    }
-    const rect = canvas.getBoundingClientRect();
-    const clientX = (e as any).clientX;
-    const clientY = (e as any).clientY;
-    if (typeof clientX !== 'number' || typeof clientY !== 'number') return null;
-    const x = Math.min(Math.max(0, clientX - rect.left), canvas.width);
-    const y = Math.min(Math.max(0, clientY - rect.top), canvas.height);
-    return { x, y };
-  };
-
-  const drawLine = (from: { x: number; y: number }, to: { x: number; y: number }) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    ctx.beginPath();
-    ctx.moveTo(from.x, from.y);
-    ctx.lineTo(to.x, to.y);
-    ctx.stroke();
-  };
-
   const clearSignature = () => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    lastPointRef.current = null;
-    strokesRef.current = [];
-    setSignatureVersion(v => v + 1);
+    setStrokes([]);
   };
 
   const hasSignature = () => {
-    for (const stroke of strokesRef.current) {
-      if (stroke.length > 1) return true;
-    }
-    return false;
+    return strokes.some(s => s.length > 1);
   };
 
   const undoSignature = () => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    strokesRef.current = strokesRef.current.slice(0, -1);
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    const w = canvas.width || 1;
-    const h = canvas.height || 1;
-    for (const stroke of strokesRef.current) {
-      if (stroke.length < 1) continue;
-      for (let i = 1; i < stroke.length; i++) {
-        const a = stroke[i - 1];
-        const b = stroke[i];
-        ctx.beginPath();
-        ctx.moveTo(a.x * w, a.y * h);
-        ctx.lineTo(b.x * w, b.y * h);
-        ctx.stroke();
-      }
-    }
-    setSignatureVersion(v => v + 1);
+    setStrokes(prev => prev.slice(0, -1));
+  };
+
+  const getSvgPoint = (e: React.PointerEvent<SVGSVGElement>) => {
+    const svg = svgRef.current;
+    if (!svg) return null;
+    const ctm = svg.getScreenCTM();
+    if (!ctm) return null;
+    const pt = svg.createSVGPoint();
+    pt.x = e.clientX;
+    pt.y = e.clientY;
+    const p = pt.matrixTransform(ctm.inverse());
+    const x = Math.min(Math.max(0, p.x), SIG_W);
+    const y = Math.min(Math.max(0, p.y), SIG_H);
+    return { x, y } as PointN;
   };
 
   const readFileDataUrl = (file: File) =>
@@ -281,7 +235,6 @@ export default function QuoteApproval() {
 
   const handleSubmit = async () => {
     if (!idDocFile || !idDocBase64) return;
-    if (!canvasRef.current) return;
 
     setError(null);
 
@@ -292,7 +245,7 @@ export default function QuoteApproval() {
 
     setSubmitting(true);
     try {
-      const signatureDataUrl = dataUrlFromCanvas(canvasRef.current);
+      const signatureDataUrl = await signatureToPngDataUrl(strokes);
       const url = code
         ? `${API_BASE}/public/q/${encodeURIComponent(code)}/submit`
         : `${API_BASE}/public/quotes/${quoteId}/submit`;
@@ -396,7 +349,7 @@ export default function QuoteApproval() {
                       <button
                         type="button"
                         onClick={undoSignature}
-                        disabled={strokesRef.current.length === 0}
+                        disabled={strokes.length === 0}
                         className="text-xs font-bold text-slate-600 hover:text-slate-900 disabled:opacity-50"
                       >
                         Deshacer
@@ -414,56 +367,57 @@ export default function QuoteApproval() {
                     <div className="px-4 py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
                       <div className="text-xs font-bold text-slate-600 uppercase tracking-wider">Firma</div>
                       <div className="text-[11px] text-slate-500">
-                        {signatureVersion ? 'Listo para firmar' : 'Firma dentro del recuadro'}
+                        Firma dentro del recuadro
                       </div>
                     </div>
-                    <canvas
-                      ref={canvasRef}
-                      className="block w-full h-[260px] touch-none"
+                    <svg
+                      ref={svgRef}
+                      viewBox={`0 0 ${SIG_W} ${SIG_H}`}
+                      preserveAspectRatio="none"
+                      className="block w-full h-[260px] touch-none bg-white"
                       style={{ touchAction: 'none' }}
                       onPointerDown={(e) => {
                         e.preventDefault();
                         drawingRef.current = true;
-                        const p = getLocalPoint(e);
-                        lastPointRef.current = p || null;
-                        if (p) {
-                          const canvas = canvasRef.current;
-                          if (canvas) {
-                            const pn = { x: canvas.width ? p.x / canvas.width : 0, y: canvas.height ? p.y / canvas.height : 0 };
-                            strokesRef.current = [...strokesRef.current, [pn]];
-                          }
-                        }
+                        const p = getSvgPoint(e);
+                        if (!p) return;
+                        setStrokes(prev => [...prev, [p]]);
                         (e.currentTarget as any).setPointerCapture(e.pointerId);
                       }}
                       onPointerMove={(e) => {
                         e.preventDefault();
                         if (!drawingRef.current) return;
-                        const p = getLocalPoint(e);
+                        const p = getSvgPoint(e);
                         if (!p) return;
-                        if (lastPointRef.current) drawLine(lastPointRef.current, p);
-                        lastPointRef.current = p;
-                        const canvas = canvasRef.current;
-                        if (canvas) {
-                          const pn = { x: canvas.width ? p.x / canvas.width : 0, y: canvas.height ? p.y / canvas.height : 0 };
-                          const strokes = strokesRef.current.slice();
-                          const last = strokes[strokes.length - 1] || null;
-                          if (last) {
-                            last.push(pn);
-                            strokesRef.current = strokes;
-                          }
-                        }
+                        setStrokes(prev => {
+                          if (!prev.length) return prev;
+                          const next = prev.slice();
+                          const last = next[next.length - 1].slice();
+                          last.push(p);
+                          next[next.length - 1] = last;
+                          return next;
+                        });
                       }}
                       onPointerUp={() => {
                         drawingRef.current = false;
-                        lastPointRef.current = null;
-                        setSignatureVersion(v => v + 1);
                       }}
                       onPointerCancel={() => {
                         drawingRef.current = false;
-                        lastPointRef.current = null;
-                        setSignatureVersion(v => v + 1);
                       }}
-                    />
+                    >
+                      <rect x="0" y="0" width={SIG_W} height={SIG_H} fill="#ffffff" />
+                      {strokes.map((s, idx) => (
+                        <path
+                          key={idx}
+                          d={buildStrokePath(s)}
+                          fill="none"
+                          stroke="#0f172a"
+                          strokeWidth="3"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      ))}
+                    </svg>
                     <div className="px-4 py-3 bg-white border-t border-slate-200 flex items-center justify-between">
                       <div className="text-[11px] text-slate-500">Usa dedo, mouse o lápiz.</div>
                       <div className="text-[11px] text-slate-500">Consejo: firma en una sola línea.</div>
