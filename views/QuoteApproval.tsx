@@ -23,6 +23,8 @@ function dataUrlFromCanvas(canvas: HTMLCanvasElement) {
   return canvas.toDataURL('image/png');
 }
 
+type PointN = { x: number; y: number };
+
 export default function QuoteApproval() {
   const { language } = useLanguage();
   const { quoteId, code } = useParams<{ quoteId?: string; code?: string }>();
@@ -42,6 +44,8 @@ export default function QuoteApproval() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const drawingRef = useRef(false);
   const lastPointRef = useRef<{ x: number; y: number } | null>(null);
+  const strokesRef = useRef<PointN[][]>([]);
+  const [signatureVersion, setSignatureVersion] = useState(0);
 
   const canSubmit = useMemo(() => {
     if (code) return Boolean(code && approverName.trim() && idDocBase64);
@@ -59,24 +63,51 @@ export default function QuoteApproval() {
   }, [quote]);
 
   useEffect(() => {
+    const redraw = () => {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      const rect = canvas.getBoundingClientRect();
+      ctx.clearRect(0, 0, rect.width, rect.height);
+      for (const stroke of strokesRef.current) {
+        if (stroke.length < 1) continue;
+        for (let i = 1; i < stroke.length; i++) {
+          const a = stroke[i - 1];
+          const b = stroke[i];
+          ctx.beginPath();
+          ctx.moveTo(a.x * rect.width, a.y * rect.height);
+          ctx.lineTo(b.x * rect.width, b.y * rect.height);
+          ctx.stroke();
+        }
+      }
+    };
+
     const setupCanvas = () => {
       const canvas = canvasRef.current;
       if (!canvas) return;
       const rect = canvas.getBoundingClientRect();
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
-      ctx.setTransform(1, 0, 0, 1, 0, 0);
-      canvas.width = Math.max(1, Math.floor(rect.width));
-      canvas.height = Math.max(1, Math.floor(rect.height));
+      const dpr = Math.max(1, Math.floor(window.devicePixelRatio || 1));
+      canvas.width = Math.max(1, Math.floor(rect.width * dpr));
+      canvas.height = Math.max(1, Math.floor(rect.height * dpr));
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
       ctx.lineWidth = 3;
       ctx.strokeStyle = '#0f172a';
+      redraw();
     };
 
     setupCanvas();
+    const ro = new ResizeObserver(() => setupCanvas());
+    if (canvasRef.current) ro.observe(canvasRef.current);
     window.addEventListener('resize', setupCanvas);
-    return () => window.removeEventListener('resize', setupCanvas);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('resize', setupCanvas);
+    };
   }, []);
 
   useEffect(() => {
@@ -154,13 +185,12 @@ export default function QuoteApproval() {
   const getLocalPoint = (e: PointerEvent | React.PointerEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
     if (!canvas) return null;
-    const ne = (e as any).nativeEvent;
-    if (ne && typeof ne.offsetX === 'number' && typeof ne.offsetY === 'number') {
-      return { x: ne.offsetX, y: ne.offsetY };
-    }
     const rect = canvas.getBoundingClientRect();
-    const x = (e as any).clientX - rect.left;
-    const y = (e as any).clientY - rect.top;
+    const clientX = (e as any).clientX;
+    const clientY = (e as any).clientY;
+    if (typeof clientX !== 'number' || typeof clientY !== 'number') return null;
+    const x = Math.min(Math.max(0, clientX - rect.left), rect.width);
+    const y = Math.min(Math.max(0, clientY - rect.top), rect.height);
     return { x, y };
   };
 
@@ -180,20 +210,40 @@ export default function QuoteApproval() {
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const rect = canvas.getBoundingClientRect();
+    ctx.clearRect(0, 0, rect.width, rect.height);
     lastPointRef.current = null;
+    strokesRef.current = [];
+    setSignatureVersion(v => v + 1);
   };
 
   const hasSignature = () => {
-    const canvas = canvasRef.current;
-    if (!canvas) return false;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return false;
-    const { data } = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    for (let i = 3; i < data.length; i += 4) {
-      if (data[i] !== 0) return true;
+    for (const stroke of strokesRef.current) {
+      if (stroke.length > 1) return true;
     }
     return false;
+  };
+
+  const undoSignature = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    strokesRef.current = strokesRef.current.slice(0, -1);
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    const rect = canvas.getBoundingClientRect();
+    ctx.clearRect(0, 0, rect.width, rect.height);
+    for (const stroke of strokesRef.current) {
+      if (stroke.length < 1) continue;
+      for (let i = 1; i < stroke.length; i++) {
+        const a = stroke[i - 1];
+        const b = stroke[i];
+        ctx.beginPath();
+        ctx.moveTo(a.x * rect.width, a.y * rect.height);
+        ctx.lineTo(b.x * rect.width, b.y * rect.height);
+        ctx.stroke();
+      }
+    }
+    setSignatureVersion(v => v + 1);
   };
 
   const readFileDataUrl = (file: File) =>
@@ -334,15 +384,31 @@ export default function QuoteApproval() {
                 <div className="space-y-2">
                   <div className="flex items-center justify-between gap-3">
                     <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Firma digital</label>
-                    <button
-                      type="button"
-                      onClick={clearSignature}
-                      className="text-xs font-bold text-slate-600 hover:text-slate-900"
-                    >
-                      Limpiar
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={undoSignature}
+                        disabled={strokesRef.current.length === 0}
+                        className="text-xs font-bold text-slate-600 hover:text-slate-900 disabled:opacity-50"
+                      >
+                        Deshacer
+                      </button>
+                      <button
+                        type="button"
+                        onClick={clearSignature}
+                        className="text-xs font-bold text-slate-600 hover:text-slate-900"
+                      >
+                        Limpiar
+                      </button>
+                    </div>
                   </div>
-                  <div className="border-2 border-slate-200 rounded-2xl overflow-hidden bg-white">
+                  <div className="border border-slate-200 rounded-2xl overflow-hidden bg-white shadow-sm">
+                    <div className="px-4 py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+                      <div className="text-xs font-bold text-slate-600 uppercase tracking-wider">Firma</div>
+                      <div className="text-[11px] text-slate-500">
+                        {signatureVersion ? 'Listo para firmar' : 'Firma dentro del recuadro'}
+                      </div>
+                    </div>
                     <canvas
                       ref={canvasRef}
                       className="w-full h-[260px] touch-none"
@@ -350,7 +416,16 @@ export default function QuoteApproval() {
                       onPointerDown={(e) => {
                         e.preventDefault();
                         drawingRef.current = true;
-                        lastPointRef.current = getLocalPoint(e) || null;
+                        const p = getLocalPoint(e);
+                        lastPointRef.current = p || null;
+                        if (p) {
+                          const canvas = canvasRef.current;
+                          if (canvas) {
+                            const rect = canvas.getBoundingClientRect();
+                            const pn = { x: rect.width ? p.x / rect.width : 0, y: rect.height ? p.y / rect.height : 0 };
+                            strokesRef.current = [...strokesRef.current, [pn]];
+                          }
+                        }
                         (e.currentTarget as any).setPointerCapture(e.pointerId);
                       }}
                       onPointerMove={(e) => {
@@ -360,16 +435,33 @@ export default function QuoteApproval() {
                         if (!p) return;
                         if (lastPointRef.current) drawLine(lastPointRef.current, p);
                         lastPointRef.current = p;
+                        const canvas = canvasRef.current;
+                        if (canvas) {
+                          const rect = canvas.getBoundingClientRect();
+                          const pn = { x: rect.width ? p.x / rect.width : 0, y: rect.height ? p.y / rect.height : 0 };
+                          const strokes = strokesRef.current.slice();
+                          const last = strokes[strokes.length - 1] || null;
+                          if (last) {
+                            last.push(pn);
+                            strokesRef.current = strokes;
+                          }
+                        }
                       }}
                       onPointerUp={() => {
                         drawingRef.current = false;
                         lastPointRef.current = null;
+                        setSignatureVersion(v => v + 1);
                       }}
                       onPointerCancel={() => {
                         drawingRef.current = false;
                         lastPointRef.current = null;
+                        setSignatureVersion(v => v + 1);
                       }}
                     />
+                    <div className="px-4 py-3 bg-white border-t border-slate-200 flex items-center justify-between">
+                      <div className="text-[11px] text-slate-500">Usa dedo, mouse o lápiz.</div>
+                      <div className="text-[11px] text-slate-500">Consejo: firma en una sola línea.</div>
+                    </div>
                   </div>
                   <p className="text-xs text-slate-500">
                     Dibuja tu firma claramente. El recuadro es grande para que la firma no quede pequeña.
