@@ -329,7 +329,12 @@ export default function Quotes() {
     const run = async () => {
       setWorkingQuoteId(quote.id);
       try {
-        const full = quote.items && quote.items.length ? quote : await loadQuoteDetails(quote.id);
+        const needsDetails =
+          !quote?.items?.length ||
+          !quote?.approvalName ||
+          !quote?.signatureDataUrl ||
+          !quote?.idDocDataUrl;
+        const full = needsDetails ? await loadQuoteDetails(quote.id) : quote;
         setActiveQuoteForPrint({
           ...full,
           items: full.items || []
@@ -352,9 +357,20 @@ export default function Quotes() {
             <body>
               ${printContents}
               <script>
+                const waitForImages = () => Promise.all(
+                  Array.from(document.images || []).map(img => {
+                    if (img.complete) return Promise.resolve();
+                    return new Promise(resolve => {
+                      img.onload = () => resolve();
+                      img.onerror = () => resolve();
+                    });
+                  })
+                );
                 window.onload = () => {
-                  window.print();
-                  window.onafterprint = () => window.close();
+                  waitForImages().finally(() => {
+                    window.print();
+                    window.onafterprint = () => window.close();
+                  });
                 };
               </script>
             </body>

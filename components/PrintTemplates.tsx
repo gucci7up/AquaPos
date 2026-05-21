@@ -21,6 +21,13 @@ export const PrintTemplates: React.FC<PrintDocumentProps> = ({ type, data, busin
     const fmtCurrency = (val: number) =>
         new Intl.NumberFormat('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(val || 0);
 
+    const imgSrc = (val: any) => {
+        const s = String(val || '');
+        if (!s) return '';
+        if (s.startsWith('data:')) return s;
+        return `data:image/png;base64,${s}`;
+    };
+
     const fmtDate = (d?: string) => {
         if (!d) return new Date().toLocaleDateString('es-DO');
         const date = new Date(d);
@@ -310,6 +317,37 @@ export const PrintTemplates: React.FC<PrintDocumentProps> = ({ type, data, busin
                     </div>
                 </div>
             </div>
+
+            {/* ── Quote Signature ── */}
+            {type === 'quote' && (data.approvalName || data.signatureDataUrl) && (
+                <div style={{ marginBottom: '26px', border: '1px solid #e2e8f0', borderRadius: '10px', overflow: 'hidden' }}>
+                    <div style={{ padding: '12px 14px', backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', gap: '16px' }}>
+                        <div style={{ fontSize: '10px', textTransform: 'uppercase', color: '#64748b', fontWeight: 'bold', letterSpacing: '1px' }}>
+                            Firma del cliente
+                        </div>
+                        <div style={{ fontSize: '11px', color: '#64748b' }}>
+                            {data.approvalName ? `Firmado por: ${data.approvalName}` : ''}
+                        </div>
+                    </div>
+                    <div style={{ padding: '14px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', alignItems: 'center' }}>
+                        <div>
+                            <div style={{ fontSize: '10px', textTransform: 'uppercase', color: '#94a3b8', fontWeight: 'bold', letterSpacing: '1px', marginBottom: '6px' }}>
+                                Cliente
+                            </div>
+                            <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#0f172a' }}>
+                                {data.customerName || data.customer || 'Cliente General'}
+                            </div>
+                        </div>
+                        <div style={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '10px', height: '90px', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+                            {data.signatureDataUrl ? (
+                                <img src={imgSrc(data.signatureDataUrl)} alt="Firma" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
+                            ) : (
+                                <div style={{ fontSize: '11px', color: '#94a3b8' }}>Sin firma</div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* ── Footer ── */}
             <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '20px', marginTop: 'auto' }}>
